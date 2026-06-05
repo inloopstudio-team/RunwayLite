@@ -11,15 +11,15 @@
 
   <h2>1. Acceptance of Terms</h2>
   <p>
-    By accessing or using HelixKit ("the Service"), you agree to be bound by these Terms of Service. If you do not agree
-    to these terms, do not use the Service.
+    By accessing or using RunwayLite ("the Service"), you agree to be bound by these Terms of Service. If you do not
+    agree to these terms, do not use the Service.
   </p>
 
   <h2>2. Description of Service</h2>
   <p>
-    HelixKit is an application that provides AI-powered conversational agents with optional integrations to third-party
-    health and wellness services. The Service may include features such as chat, data synchronization, and personalized
-    AI interactions.
+    RunwayLite is an application that provides AI-powered conversational agents with optional integrations to
+    third-party health and wellness services. The Service may include features such as chat, data synchronization, and
+    personalized AI interactions.
   </p>
 
   <h2>3. User Accounts</h2>
@@ -59,7 +59,7 @@
 
   <h2>8. Intellectual Property</h2>
   <p>
-    The Service and its original content, features, and functionality are owned by HelixKit. Your data remains yours.
+    The Service and its original content, features, and functionality are owned by RunwayLite. Your data remains yours.
   </p>
 
   <h2>9. Limitation of Liability</h2>

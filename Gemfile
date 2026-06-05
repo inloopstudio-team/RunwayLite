@@ -23,6 +23,9 @@ gem "solid_cable"
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
 
+# Load .env files in development/test
+gem "dotenv-rails", groups: [:development, :test]
+
 # Deploy this application anywhere as a Docker container [https://kamal-deploy.org]
 gem "kamal", require: false
 
@@ -93,3 +96,11 @@ gem "discard", "~> 1.3"
 
 # X/Twitter API client
 gem "x"
+
+# Finite Object State Machine — declarative lifecycles for business objects
+gem "fosm-rails", github: "inloopstudio/fosm-rails"
+
+# Turso/libSQL adapter for FOSM database
+gem "libsql_activerecord"
+
+gem "tidewave", "~> 0.5.0", :group => :development

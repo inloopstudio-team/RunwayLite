@@ -3,7 +3,7 @@ class AddMultiThreadedThinkingFields < ActiveRecord::Migration[8.1]
   def change
     add_column :chat_agents, :agent_summary, :text
     add_column :chat_agents, :agent_summary_generated_at, :datetime
-    add_column :chat_agents, :borrowed_context_json, :jsonb
+    add_column :chat_agents, :borrowed_context_json, :json
 
     add_index :chat_agents, [ :agent_id, :agent_summary_generated_at ],
               name: "index_chat_agents_on_agent_summary_recency"

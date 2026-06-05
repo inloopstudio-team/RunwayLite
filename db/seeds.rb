@@ -8,7 +8,8 @@
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
 
-Setting.instance
+setting = Setting.instance
+setting.update!(site_name: 'RunwayLite') if setting.site_name.blank? || setting.site_name == 'HelixKit'
 puts "✓ Site settings initialized"
 
 # Load environment-specific seeds

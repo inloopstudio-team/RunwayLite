@@ -11,7 +11,7 @@
 
   <h2>1. Introduction</h2>
   <p>
-    HelixKit ("we", "us", or "our") respects your privacy. This Privacy Policy explains how we collect, use, disclose,
+    RunwayLite ("we", "us", or "our") respects your privacy. This Privacy Policy explains how we collect, use, disclose,
     and safeguard your information when you use our application.
   </p>
 

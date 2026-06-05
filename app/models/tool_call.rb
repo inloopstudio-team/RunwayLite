@@ -1,6 +1,6 @@
 class ToolCall < ApplicationRecord
 
-  acts_as_tool_call
+  belongs_to :message
 
   def thought_signature
     replay_payload&.dig("thought_signature")

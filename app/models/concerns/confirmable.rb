@@ -5,8 +5,20 @@ module Confirmable
   included do
     before_create :generate_confirmation_token, if: :needs_confirmation?
 
-    scope :confirmed, -> { where.not(confirmed_at: nil) }
-    scope :unconfirmed, -> { where(confirmed_at: nil) }
+    scope :confirmed, -> {
+      if column_names.include?("state")
+        where(state: "active")
+      else
+        where.not(confirmed_at: nil)
+      end
+    }
+    scope :unconfirmed, -> {
+      if column_names.include?("state")
+        where(state: "pending")
+      else
+        where(confirmed_at: nil)
+      end
+    }
 
     generates_token_for :email_confirmation, expires_in: 24.hours do
       [ confirmable_attributes_for_token, confirmed_at&.to_i, confirmation_sent_at&.to_i ]
@@ -17,13 +29,16 @@ module Confirmable
     confirmed_at.present?
   end
 
+  # confirm! is now provided by Fosm::Lifecycle (fires the :confirm event).
+  # The timestamp and token cleanup happen in the lifecycle side effect.
+  # This method is kept as a fallback for models that don't use FOSM.
   def confirm!
-    return true if confirmed?
-
-    update!(
-      confirmed_at: Time.current,
-      confirmation_token: nil
-    )
+    if self.class.respond_to?(:fosm_lifecycle) && self.class.fosm_lifecycle.present?
+      fire!(:confirm, actor: :system)
+    else
+      return true if confirmed?
+      update!(confirmed_at: Time.current, confirmation_token: nil)
+    end
   end
 
   def confirmation_token_for_url

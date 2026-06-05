@@ -17,9 +17,9 @@ class CreateProfiles < ActiveRecord::Migration[8.0]
       dir.up do
         execute <<-SQL
           INSERT INTO profiles (user_id, first_name, last_name, theme, timezone, preferences, created_at, updated_at)
-          SELECT id, first_name, last_name,#{' '}
-                 COALESCE(preferences->>'theme', 'system'),#{' '}
-                 timezone,#{' '}
+          SELECT id, first_name, last_name,
+                 COALESCE(json_extract(preferences, '$.theme'), 'system'),
+                 timezone,
                  COALESCE(preferences, '{}'),
                  created_at, updated_at
           FROM users
@@ -31,7 +31,7 @@ class CreateProfiles < ActiveRecord::Migration[8.0]
     remove_column :users, :first_name, :string
     remove_column :users, :last_name, :string
     remove_column :users, :timezone, :string
-    remove_column :users, :preferences, :jsonb
+    remove_column :users, :preferences, :json
   end
 
 end

@@ -1,12 +1,12 @@
-# Svelte App Kit for Ruby on Rails
+# RunwayLite - A Rails Kit for Business Operating System
 
-<div align="center">
-  <img src="app/assets/images/helix-kit-logo.svg" alt="Helix Kit Logo" width="100" height="100">
-</div>
+### Mostly used by AI Agents to manage a business.
 
-This is a start app kit template analogous to Jumpstart Pro or BulletTrain, but using Svelte and Inertia.js for the frontend, with Ruby on Rails as the backend, and including a number of other useful libraries and tools.
+RunwayLite is a fork of [HelixKit](https://github.com/danieltenner/helix_kit) by [@swombat](https://github.com/swombat). It is a Rails app kit using Svelte and Inertia.js for the frontend, with Ruby on Rails as the backend, and including a number of useful libraries and tools.
 
-Unlike typical app-kits, this one begins with the assumption that all apps worth building at this point will have heavy AI integration, including at the very least chat/conversation features, agentic set ups, tools, and group chat features.
+Unlike typical app-kits, RunwayLite begins with the assumption that all apps worth building at this point will have heavy AI integration, including at the very least chat/conversation features, agentic set ups, tools, and group chat features.
+
+<video src="public/videos/RunwayLitev001_small.mov" controls width="100%"></video>
 
 ## Features
 
@@ -19,7 +19,7 @@ Unlike typical app-kits, this one begins with the assumption that all apps worth
 - **[JS Routes](https://github.com/railsware/js-routes)** - A library for generating JavaScript routes in Rails applications.
 - **Rails Authentication** - Built-in authentication using the default Rails 8 authentication system.
 - **[Vite](https://vitejs.dev/)** - A fast and modern frontend bundler.
-- **[PostgreSQL](https://www.postgresql.org/)** - A powerful, open-source relational database system.
+- **[SQLite](https://www.sqlite.org/) / [Turso](https://turso.tech/)** - SQLite for development (via libsql), PostgreSQL for production primary database, and Turso for cloud-synced SQLite databases. Zero-config local development with production-grade cloud sync.
 - **[DaisyUI](https://daisyui.com/)** - A plugin for Tailwind CSS that provides a set of pre-designed components, for rapid prototyping of components not covered by ShadcnUI.
 - **[Claude Code Ready](https://www.anthropic.com/news/claude-code)** - Clear documentation in `/docs/` to enable Claude Code to perform at its best.
 - **[SolidQueue/Cable/Cache](https://medium.com/@reinteractivehq/rails-8-solid-trifecta-comparison-44a76cb92ac3)** - Set up in development environment, for background jobs, real-time features, and caching.
@@ -34,6 +34,7 @@ Unlike typical app-kits, this one begins with the assumption that all apps worth
     - [x] Roles
 - **Svelte Object Synchronization** - Using ActionCable and Inertia's partial reload and a custom Regitry to keep Svelte $props up to date in real-time.
 - Audit Logging with audit log viewer (required in many business applications).
+- **FOSM (Finite Object State Machine)** - Declarative lifecycle management for business objects where `fire!` is the only mutation path. This is critical for AI coding agents building business software: it constrains state transitions to well-defined rules, prevents invalid mutations, and makes business logic auditable and predictable — exactly what autonomous agents need to safely operate on production data.
 - AI Integration features:
     - [x] OpenRouter integration
     - [x] Prompt system

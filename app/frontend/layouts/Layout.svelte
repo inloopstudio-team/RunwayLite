@@ -33,5 +33,12 @@
 <div class="bg-bg">
   <Navbar />
   <main>{@render children?.()}</main>
+  <footer class="border-t py-4 px-6 text-center text-xs text-muted-foreground">
+    For more advanced features, check out <a
+      href="https://inloop.studio/runway"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="underline hover:text-foreground transition-colors">inloop.studio/runway</a>
+  </footer>
   <Toaster />
 </div>

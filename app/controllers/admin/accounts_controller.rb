@@ -22,13 +22,13 @@ class Admin::AccountsController < ApplicationController
   end
 
   def disable
-    @account.disable!
+    @account.disable!(actor: Current.user)
     audit(:admin_disable_account, @account, account_id: @account.id, name: @account.name)
     redirect_to admin_accounts_path(account_id: @account), notice: "Account disabled"
   end
 
   def enable
-    @account.enable!
+    @account.enable!(actor: Current.user)
     audit(:admin_enable_account, @account, account_id: @account.id, name: @account.name)
     redirect_to admin_accounts_path(account_id: @account), notice: "Account enabled"
   end

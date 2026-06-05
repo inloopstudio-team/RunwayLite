@@ -38,10 +38,26 @@
 
 class Membership < ApplicationRecord
 
+  include Fosm::Lifecycle
   include Confirmable,
           JsonAttributes,
           SyncAuthorizable,
           Broadcastable
+
+  lifecycle do
+    state :pending, initial: true
+    state :active
+
+    event :confirm, from: :pending, to: :active
+
+    side_effect :record_confirmation, on: :confirm do |membership, _transition|
+      membership.update_columns(
+        confirmed_at: Time.current,
+        confirmation_token: nil
+      )
+      membership.update_column(:invitation_accepted_at, Time.current) if membership.invitation?
+    end
+  end
 
   # Constants
   ROLES = %w[owner admin member].freeze
@@ -74,14 +90,12 @@ class Membership < ApplicationRecord
   before_create :auto_confirm_if_skip_confirmation
   after_create_commit :send_invitation_email, if: :invitation?
   after_create_commit :send_confirmation_email, unless: -> { skip_confirmation || invitation? }
-  after_update_commit :track_invitation_acceptance, if: :became_confirmed?
-
   # Scopes
   scope :owners, -> { where(role: "owner") }
   scope :admins, -> { where(role: [ "owner", "admin" ]) }
   scope :members, -> { where(role: "member") }
-  scope :pending_invitations, -> { where(confirmed_at: nil).where.not(invited_by_id: nil) }
-  scope :accepted_invitations, -> { where.not(confirmed_at: nil).where.not(invited_by_id: nil) }
+  scope :pending_invitations, -> { where(state: "pending").where.not(invited_by_id: nil) }
+  scope :accepted_invitations, -> { where(state: "active").where.not(invited_by_id: nil) }
 
   # Default Json Serialization
   json_attributes :display_name, :status, :invitation?, :invitation_pending?, :email_address, :full_name, :confirmed?,
@@ -121,11 +135,11 @@ class Membership < ApplicationRecord
   end
 
   def invitation_pending?
-    invitation? && !confirmed?
+    invitation? && pending?
   end
 
   def invitation_accepted?
-    invitation? && confirmed?
+    invitation? && active?
   end
 
   def removable_by?(user)
@@ -166,9 +180,9 @@ class Membership < ApplicationRecord
   end
 
   def status
-    if invitation_pending?
+    if pending? && invitation?
       "invited"
-    elsif confirmed?
+    elsif active?
       "active"
     else
       "pending"
@@ -178,7 +192,10 @@ class Membership < ApplicationRecord
   private
 
   def auto_confirm_if_skip_confirmation
-    self.confirmed_at = Time.current if skip_confirmation
+    if skip_confirmation
+      self.confirmed_at = Time.current
+      self.state = "active"
+    end
   end
 
   def confirmable_attributes_for_token
@@ -216,15 +233,6 @@ class Membership < ApplicationRecord
 
   def send_confirmation_email
     AccountMailer.confirmation(self).deliver_later
-  end
-
-  # Properly named callback method
-  def became_confirmed?
-    saved_change_to_confirmed_at? && confirmed_at.present?
-  end
-
-  def track_invitation_acceptance
-    update_column(:invitation_accepted_at, Time.current) if invitation?
   end
 
   def needs_confirmation?

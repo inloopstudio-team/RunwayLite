@@ -48,7 +48,7 @@
       <h2 class="text-lg font-semibold">Agent Memory</h2>
       <p class="text-sm text-muted-foreground">
         {locked
-          ? "This agent's memory is self-managed in its external runtime. HelixKit shows the last synced memory backup read-only."
+          ? "This agent's memory is self-managed in its external runtime. RunwayLite shows the last synced memory backup read-only."
           : "Review and manage this agent's memories. Core memories are permanent; journal entries fade after a week."}
       </p>
     </div>

@@ -1,7 +1,6 @@
 <script>
   // grab page props from inertia
   import { page, Link, router } from '@inertiajs/svelte';
-  import Logo from '$lib/components/misc/HelixKitLogo.svelte';
   import { UserCircle, Moon, Sun, MagnifyingGlass } from 'phosphor-svelte';
   import * as DropdownMenu from '$lib/components/shadcn/dropdown-menu/index.js';
   import { Button, buttonVariants } from '$lib/components/shadcn/button/index.js';
@@ -88,10 +87,28 @@
 <nav>
   <div class="flex items-center justify-between p-4 px-4 md:px-10 border-b gap-2 md:gap-4">
     <div class="flex items-center gap-4 md:gap-8">
-      <Link href="/" class="flex items-center gap-2">
-        <Logo class="h-8 w-8 md:h-10 md:w-10" />
-        <span class="hidden sm:inline">{siteSettings?.site_name || 'HelixKit'}</span>
-      </Link>
+      <div class="flex items-center gap-3">
+        <Link href="/" class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm">
+            <svg class="w-4 h-4 text-white" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M2 13L14 3M14 3H7M14 3V10"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"></path>
+            </svg>
+          </div>
+          <span class="text-sm font-semibold tracking-wide">{siteSettings?.site_name || 'Inloop Runway'}</span>
+        </Link>
+        <a
+          href="https://inloop.studio"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors">
+          by inloop.studio
+        </a>
+      </div>
       <div class="hidden md:flex items-center">
         {#each links as link}
           {#if link.show}

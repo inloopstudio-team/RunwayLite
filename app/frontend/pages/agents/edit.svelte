@@ -282,8 +282,6 @@
       });
   }
 
-
-
   function directoryKey(section, entryOrPath) {
     const path = typeof entryOrPath === 'string' ? entryOrPath : entryOrPath.path;
     return `${section.target}:${path}`;
@@ -511,8 +509,8 @@
               {#if agent.runtime === 'inline'}
                 <div class="space-y-3">
                   <p class="text-sm text-muted-foreground">
-                    Run this agent in a HelixKit-managed Docker sandbox. HelixKit will create the identity volume, start
-                    the runtime, and send requests to the external agent.
+                    Run this agent in a RunwayLite-managed Docker sandbox. RunwayLite will create the identity volume,
+                    start the runtime, and send requests to the external agent.
                     {#if localDevEndpointMode}
                       In local development, the shim port is published to <span class="font-mono">127.0.0.1</span>
                       automatically so this can be tested on your Mac.
@@ -530,7 +528,7 @@
               {:else}
                 <div class="space-y-3">
                   <p class="text-sm text-muted-foreground">
-                    Identity fields in HelixKit are now read-only backups. The running agent's identity lives in its
+                    Identity fields in RunwayLite are now read-only backups. The running agent's identity lives in its
                     hosted filesystem below.
                   </p>
                   <div class="rounded border bg-muted/30 p-3 text-sm">
@@ -553,7 +551,11 @@
                       variant="outline"
                       onclick={sendOrientation}
                       disabled={sendingOrientation || agent.health_state !== 'healthy'}>
-                      {sendingOrientation ? 'Orienting...' : agent.oriented_at ? 'Re-send orientation' : 'Send orientation'}
+                      {sendingOrientation
+                        ? 'Orienting...'
+                        : agent.oriented_at
+                          ? 'Re-send orientation'
+                          : 'Send orientation'}
                     </Button>
                     <Button type="button" onclick={sendTestRequest} disabled={sendingTestRequest}>
                       {sendingTestRequest ? 'Sending...' : 'Send test trigger'}
@@ -587,13 +589,15 @@
                   {#if orientationResult.runtime_stderr}
                     <details class="mt-2">
                       <summary class="cursor-pointer font-medium text-destructive">Runtime stderr</summary>
-                      <pre class="mt-1 overflow-x-auto whitespace-pre-wrap text-xs">{orientationResult.runtime_stderr}</pre>
+                      <pre
+                        class="mt-1 overflow-x-auto whitespace-pre-wrap text-xs">{orientationResult.runtime_stderr}</pre>
                     </details>
                   {/if}
                   {#if orientationResult.runtime_stdout}
                     <details class="mt-2">
                       <summary class="cursor-pointer font-medium">Runtime stdout</summary>
-                      <pre class="mt-1 overflow-x-auto whitespace-pre-wrap text-xs">{orientationResult.runtime_stdout}</pre>
+                      <pre
+                        class="mt-1 overflow-x-auto whitespace-pre-wrap text-xs">{orientationResult.runtime_stdout}</pre>
                     </details>
                   {/if}
                 </div>
@@ -643,7 +647,12 @@
               <div class="grid gap-2 text-sm sm:grid-cols-2">
                 <p>
                   Docker daemon:
-                  <span class="font-medium">{sandboxStatus.docker_available === null ? 'checking' : sandboxStatus.docker_available ? 'reachable' : 'not reachable'}</span>
+                  <span class="font-medium"
+                    >{sandboxStatus.docker_available === null
+                      ? 'checking'
+                      : sandboxStatus.docker_available
+                        ? 'reachable'
+                        : 'not reachable'}</span>
                 </p>
                 {#if sandboxStatus.docker_version}
                   <p>Docker version: <span class="font-mono">{sandboxStatus.docker_version}</span></p>
@@ -659,21 +668,40 @@
                   </p>
                 {/if}
                 <p>
-                  Runtime image present: <span class="font-medium">{sandboxStatus.image_present === null ? 'checking' : sandboxStatus.image_present ? 'yes' : 'no'}</span>
+                  Runtime image present: <span class="font-medium"
+                    >{sandboxStatus.image_present === null
+                      ? 'checking'
+                      : sandboxStatus.image_present
+                        ? 'yes'
+                        : 'no'}</span>
                 </p>
                 <p>
-                  Container exists: <span class="font-medium">{sandboxStatus.container_exists === null ? 'checking' : sandboxStatus.container_exists ? 'yes' : 'no'}</span>
+                  Container exists: <span class="font-medium"
+                    >{sandboxStatus.container_exists === null
+                      ? 'checking'
+                      : sandboxStatus.container_exists
+                        ? 'yes'
+                        : 'no'}</span>
                 </p>
                 {#if sandboxStatus.container_exists}
                   <p>
                     Container image current:
-                    <span class="font-medium">{sandboxStatus.container_image_current === null || sandboxStatus.container_image_current === undefined ? 'checking' : sandboxStatus.container_image_current ? 'yes' : 'no'}</span>
+                    <span class="font-medium"
+                      >{sandboxStatus.container_image_current === null ||
+                      sandboxStatus.container_image_current === undefined
+                        ? 'checking'
+                        : sandboxStatus.container_image_current
+                          ? 'yes'
+                          : 'no'}</span>
                   </p>
                   <p>
                     Image stale:
-                    <span
-                      class={sandboxStatus.image_stale ? 'font-medium text-amber-700' : 'font-medium'}>
-                      {sandboxStatus.image_stale === null || sandboxStatus.image_stale === undefined ? 'checking' : sandboxStatus.image_stale ? 'yes' : 'no'}
+                    <span class={sandboxStatus.image_stale ? 'font-medium text-amber-700' : 'font-medium'}>
+                      {sandboxStatus.image_stale === null || sandboxStatus.image_stale === undefined
+                        ? 'checking'
+                        : sandboxStatus.image_stale
+                          ? 'yes'
+                          : 'no'}
                     </span>
                   </p>
                 {/if}
@@ -685,15 +713,29 @@
                 {/if}
                 <p>
                   Identity volume:
-                  <span class="font-medium">{sandboxStatus.identity_volume_exists === null ? 'checking' : sandboxStatus.identity_volume_exists ? 'present' : 'missing'}</span>
+                  <span class="font-medium"
+                    >{sandboxStatus.identity_volume_exists === null
+                      ? 'checking'
+                      : sandboxStatus.identity_volume_exists
+                        ? 'present'
+                        : 'missing'}</span>
                 </p>
                 <p>
                   Chaos volume: <span class="font-medium"
-                    >{sandboxStatus.chaos_volume_exists === null ? 'checking' : sandboxStatus.chaos_volume_exists ? 'present' : 'missing'}</span>
+                    >{sandboxStatus.chaos_volume_exists === null
+                      ? 'checking'
+                      : sandboxStatus.chaos_volume_exists
+                        ? 'present'
+                        : 'missing'}</span>
                 </p>
                 <p>
                   Repo/workspace volume:
-                  <span class="font-medium">{sandboxStatus.repo_volume_exists === null ? 'checking' : sandboxStatus.repo_volume_exists ? 'present' : 'missing'}</span>
+                  <span class="font-medium"
+                    >{sandboxStatus.repo_volume_exists === null
+                      ? 'checking'
+                      : sandboxStatus.repo_volume_exists
+                        ? 'present'
+                        : 'missing'}</span>
                 </p>
               </div>
               {#if sandboxStatus.docker_error}
@@ -710,8 +752,8 @@
               {/if}
               {#if sandboxStatus.container_exists && sandboxStatus.container_image_current === false}
                 <div class="rounded border border-amber-300/40 bg-amber-50 p-3 text-sm text-amber-900">
-                  This container was created from an older runtime image. Restarting promotion will recreate the container
-                  while preserving its identity and Chaos volumes.
+                  This container was created from an older runtime image. Restarting promotion will recreate the
+                  container while preserving its identity and Chaos volumes.
                 </div>
               {/if}
               {#if sandboxStatus.container_error}
@@ -774,10 +816,14 @@
                             {:else if filePreviews[filePreviewKey(section, entry)]?.loading}
                               <p class="mt-2 text-xs text-muted-foreground">Loading preview…</p>
                             {:else if filePreviews[filePreviewKey(section, entry)]?.error}
-                              <p class="mt-2 text-xs text-destructive">{filePreviews[filePreviewKey(section, entry)].error}</p>
+                              <p class="mt-2 text-xs text-destructive">
+                                {filePreviews[filePreviewKey(section, entry)].error}
+                              </p>
                             {:else if filePreviews[filePreviewKey(section, entry)]?.loaded}
                               <pre
-                                class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded bg-background p-3 text-xs">{filePreviews[filePreviewKey(section, entry)].content}</pre>
+                                class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded bg-background p-3 text-xs">{filePreviews[
+                                  filePreviewKey(section, entry)
+                                ].content}</pre>
                               {#if filePreviews[filePreviewKey(section, entry)].truncated}
                                 <p class="mt-1 text-xs text-muted-foreground">Preview truncated.</p>
                               {/if}

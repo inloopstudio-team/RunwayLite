@@ -4,7 +4,7 @@
   import { completedFeatures, todoFeatures } from '$lib/home-features.js';
   import { GithubLogo } from 'phosphor-svelte';
 
-  const githubUrl = 'https://github.com/swombat/helix_kit';
+  const githubUrl = 'https://github.com/inloopstudio-team/RunwayLite';
 </script>
 
 <svelte:head>
@@ -14,16 +14,25 @@
 <div class="bg-muted border-b">
   <div class="mx-auto max-w-2xl px-6 lg:max-w-7xl lg:px-8 border-l border-r border-dashed pt-40 pb-50">
     <h1 class="text-4xl tracking-tighter text-balance max-lg:font-medium max-sm:px-4 sm:text-5xl lg:text-6xl">
-      HelixKit: Svelte App Kit for Ruby on Rails
+      RunwayLite: A Rails Kit for Business Operating System
     </h1>
+    <h3 class="text-lg text-muted-foreground mt-2 font-normal tracking-wide">enabling Human+AI Collaboration</h3>
     <p class="opacity-80 mt-4">
-      A start app kit template analogous to Jumpstart Pro or BulletTrain, but using Svelte and Inertia.js for the
-      frontend, with Ruby on Rails as the backend, and including a number of other useful libraries and tools.
+      RunwayLite is a fork of <a
+        href="https://github.com/danieltenner/helix_kit"
+        class="underline"
+        target="_blank"
+        rel="noopener noreferrer">HelixKit</a>
+      by <a href="https://github.com/swombat" class="underline" target="_blank" rel="noopener noreferrer">@swombat</a>.
+      It is a Rails app kit using Svelte and Inertia.js for the frontend, with Ruby on Rails as the backend, and
+      including a number of useful libraries and tools — including
+      <a href="https://github.com/inloopstudio/fosm-rails" class="underline" target="_blank" rel="noopener noreferrer"
+        >fosm-rails</a> for declarative model lifecycle management.
     </p>
     <p class="opacity-80 mt-4">
-      Unlike typical app-kits, this one begins with the assumption that all apps worth building at this point will have
-      heavy AI integration, including at the very least chat/conversation features, agentic set ups, tools, and group
-      chat features.
+      Unlike typical app-kits, RunwayLite begins with the assumption that all apps worth building at this point will
+      have heavy AI integration, including at the very least chat/conversation features, agentic set ups, tools, and
+      group chat features.
     </p>
     <div class="mt-8">
       <a href={githubUrl} class={buttonVariants({ variant: 'default' })} target="_blank" rel="noopener noreferrer">

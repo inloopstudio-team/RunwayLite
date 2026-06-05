@@ -91,8 +91,8 @@
     <a class="text-sm text-muted-foreground hover:text-foreground" href={editPath}>Back to agent settings</a>
     <h1 class="text-3xl font-semibold">Promote {agent.name}</h1>
     <p class="text-muted-foreground">
-      Move this agent into a HelixKit-hosted sandbox container. HelixKit creates the volume, starts the runtime, checks
-      health, and keeps the agent reachable without a GitHub repo, master key, DNS, or SSH deploy step.
+      Move this agent into a RunwayLite-hosted sandbox container. RunwayLite creates the volume, starts the runtime,
+      checks health, and keeps the agent reachable without a GitHub repo, master key, DNS, or SSH deploy step.
     </p>
   </div>
 
@@ -174,9 +174,8 @@
   <section class="space-y-4 rounded-lg border p-5">
     <h2 class="text-lg font-medium">Hosted sandbox promotion</h2>
     <p class="text-sm text-muted-foreground">
-      HelixKit will generate agent-scoped credentials, create a Docker identity volume, seed the current identity, start <span
-        class="font-mono">helix-kit-agents</span
-      >, and verify the shim health endpoint.
+      RunwayLite will generate agent-scoped credentials, create a Docker identity volume, seed the current identity,
+      start <span class="font-mono">helix-kit-agents</span>, and verify the shim health endpoint.
       {#if localDevEndpointMode}
         In local development, the shim port is published to <span class="font-mono">127.0.0.1</span> automatically so this
         can be tested on your Mac.

@@ -1,8 +1,25 @@
 class Account < ApplicationRecord
 
+  include Fosm::Lifecycle
   include JsonAttributes
   include SyncAuthorizable
   include Broadcastable
+
+  lifecycle do
+    state :active,   initial: true
+    state :disabled
+
+    event :disable, from: :active,   to: :disabled
+    event :enable,  from: :disabled, to: :active
+
+    side_effect :set_disabled_timestamp, on: :disable do |account, _transition|
+      account.update_column(:disabled_at, Time.current)
+    end
+
+    side_effect :clear_disabled_timestamp, on: :enable do |account, _transition|
+      account.update_column(:disabled_at, nil)
+    end
+  end
 
   # Broadcasting configuration
   broadcasts_to :all # Admin collection
@@ -40,8 +57,8 @@ class Account < ApplicationRecord
   # Scopes
   scope :personal, -> { where(account_type: :personal) }
   scope :team, -> { where(account_type: :team) }
-  scope :enabled, -> { where(disabled_at: nil) }
-  scope :disabled, -> { where.not(disabled_at: nil) }
+  scope :enabled, -> { where(state: "active") }
+  scope :disabled, -> { where(state: "disabled") }
 
   encrypts :github_pat
 
@@ -89,20 +106,10 @@ class Account < ApplicationRecord
     memberships.confirmed.count
   end
 
+  # FOSM generates: active?, disabled?, disable!(actor:), enable!(actor:)
+  # Override active? to also require members
   def active?
-    !disabled? && members_count > 0
-  end
-
-  def disabled?
-    disabled_at.present?
-  end
-
-  def disable!
-    update!(disabled_at: Time.current) unless disabled?
-  end
-
-  def enable!
-    update!(disabled_at: nil) if disabled?
+    state.to_s == "active" && members_count > 0
   end
 
   def pending_invitations_count

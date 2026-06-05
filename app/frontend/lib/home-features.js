@@ -25,6 +25,7 @@ import {
   Trash,
   Chats,
   CloudArrowUp,
+  Graph,
 } from 'phosphor-svelte';
 
 export const completedFeatures = [
@@ -83,10 +84,18 @@ export const completedFeatures = [
     icon: Rocket,
   },
   {
-    title: 'PostgreSQL',
-    description: 'A powerful, open-source relational database system.',
-    link: 'https://www.postgresql.org/',
+    title: 'SQLite + Turso',
+    description:
+      'SQLite for development (via libsql), with Turso for cloud-synced SQLite in production. Zero-config local development with production-grade cloud sync. PostgreSQL is no longer supported.',
+    link: 'https://turso.tech/',
     icon: Database,
+  },
+  {
+    title: 'FOSM (Finite Object State Machine)',
+    description:
+      'Declarative lifecycle management for Rails models. Define states, events, and transitions with side effects — used throughout RunwayLite for accounts, memberships, and more.',
+    link: 'https://github.com/inloopstudio/fosm-rails',
+    icon: Graph,
   },
   {
     title: 'DaisyUI',
@@ -152,7 +161,7 @@ export const completedFeatures = [
   },
   {
     title: 'Automated Database Backups',
-    description: 'Daily PostgreSQL backups to S3 via scheduled job with compression and easy restore process.',
+    description: 'Daily Turso/SQLite backups to S3 via scheduled job with compression and easy restore process.',
     icon: CloudArrowUp,
   },
   {

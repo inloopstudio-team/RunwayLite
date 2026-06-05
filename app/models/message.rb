@@ -10,7 +10,8 @@ class Message < ApplicationRecord
   include Message::Replayable
   include Message::Streamable
 
-  acts_as_message model: :ai_model, model_class: "AiModel", model_foreign_key: :ai_model_id
+  belongs_to :ai_model, class_name: "AiModel", optional: true
+  has_many :tool_calls, dependent: :destroy
 
   # RubyLLM 1.10+ uses thinking_text column and returns a RubyLLM::Thinking object.
   # We override to maintain backwards compatibility with our string-based API.

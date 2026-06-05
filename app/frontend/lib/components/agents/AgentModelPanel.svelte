@@ -69,7 +69,7 @@
       {#if locked}
         <p class="text-sm text-muted-foreground">
           This agent is now self-hosted. It runs inside a regular coding harness and can use the command line tools
-          available in that runtime rather than HelixKit's inline tool checklist.
+          available in that runtime rather than RunwayLite's inline tool checklist.
         </p>
       {:else}
         <p class="text-sm text-muted-foreground">

@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+  mount Fosm::Engine => "/fosm"
   if Rails.env.test?
     namespace :test_support, path: "test" do
       namespace :e2e do
