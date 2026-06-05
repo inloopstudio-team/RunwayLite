@@ -6,7 +6,7 @@ RunwayLite is a fork of [HelixKit](https://github.com/danieltenner/helix_kit) by
 
 Unlike typical app-kits, RunwayLite begins with the assumption that all apps worth building at this point will have heavy AI integration, including at the very least chat/conversation features, agentic set ups, tools, and group chat features.
 
-https://github.com/inloopstudio-team/RunwayLite/raw/refs/heads/master/public/videos/RunwayLitev001_small.mov
+![RunwayLite Demo](public/videos/RunwayLitev001.gif)
 
 ## Features
 
