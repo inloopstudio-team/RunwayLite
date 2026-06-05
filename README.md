@@ -2,9 +2,13 @@
 
 ### Mostly used by AI Agents to manage a business.
 
-RunwayLite is a fork of [HelixKit](https://github.com/danieltenner/helix_kit) by [@swombat](https://github.com/swombat). It is a Rails app kit using Svelte and Inertia.js for the frontend, with Ruby on Rails as the backend, and including a number of useful libraries and tools.
+RunwayLite is a fork of [HelixKit](https://github.com/danieltenner/helix_kit) by [@swombat](https://github.com/swombat). It is a Rails app kit using Svelte and Inertia.js for the frontend, with Ruby on Rails as the backend, and including a number of useful libraries and tools — including [fosm-rails](https://github.com/inloopstudio/fosm-rails) for declarative model lifecycle management.
 
 Unlike typical app-kits, RunwayLite begins with the assumption that all apps worth building at this point will have heavy AI integration, including at the very least chat/conversation features, agentic set ups, tools, and group chat features.
+
+Every business object that moves through a lifecycle — an Invoice, a Candidate, a Contract — should have its states, transitions, guards, and side effects declared in one place as part of what it *means* to be that object. The conventional `status` string column scatters business rules across controllers, callbacks, and service objects. Nobody can answer "what are the rules?" without reading every file. **FOSM declares the rules as part of the model itself.**
+
+When you pair AI with a FOSM-structured codebase, you get bounded autonomy: an agent can only do what the state machine allows, cannot skip steps, and cannot invent transitions. The machine is the guardrail — you don't need to trust the AI's judgment, only the lifecycle definition. **AI Coding Agents perform significantly better on business processes when they can see the state machine in a declarative DSL** — the lifecycle block tells them exactly what is possible, what has happened, and what comes next. FOSM makes AI safe. AI makes FOSM practical.
 
 ![RunwayLite Demo](public/videos/RunwayLitev001.gif)
 
