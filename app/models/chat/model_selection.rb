@@ -31,6 +31,21 @@ module Chat::ModelSelection
       label: "Gemini 3.7 Flash",
       group: "Top Models",
       provider_model_id: "gemini-3.7-flash",
+      group: "Top Models",
+      provider_model_id: "claude-fable-5"
+    },
+    {
+      model_id: "deepseek/deepseek-v4-pro",
+      label: "DeepSeek V4 Pro",
+      group: "Top Models",
+      provider_model_id: "deepseek-v4-pro",
+      thinking: { supported: true, requires_direct_api: true }
+    },
+    {
+      model_id: "google/gemini-3.1-pro-preview",
+      label: "Gemini 3.1 Pro",
+      group: "Top Models",
+      provider_model_id: "gemini-3.1-pro-preview",
       thinking: { supported: true },
       audio_input: true
     },
@@ -46,6 +61,8 @@ module Chat::ModelSelection
     { model_id: "minimax/minimax-m3", label: "MiniMax M3", group: "Top Models", thinking: { supported: true } },
     { model_id: "moonshotai/kimi-k3", label: "Kimi K3", group: "Top Models", thinking: { supported: true } },
     { model_id: "qwen/qwen3.8-max", label: "Qwen3.8 Max", group: "Top Models", thinking: { supported: true } },
+    { model_id: "moonshotai/kimi-k2.7-code", label: "Kimi K2.7 Code", group: "Top Models" },
+    { model_id: "qwen/qwen3.7-max", label: "Qwen3.7 Max", group: "Top Models", thinking: { supported: true } },
     { model_id: "z-ai/glm-5.2", label: "GLM 5.2", group: "Top Models", thinking: { supported: true } },
 
     # OpenAI
@@ -60,6 +77,7 @@ module Chat::ModelSelection
       provider_model_id: "gpt-5.5-pro",
       thinking: { supported: true, requires_direct_api: true }
     },
+    { model_id: "openai/gpt-5.4", label: "GPT-5.4", group: "OpenAI", provider_model_id: "gpt-5.4", thinking: { supported: true } },
     {
       model_id: "openai/gpt-5.2",
       label: "GPT-5.2",
