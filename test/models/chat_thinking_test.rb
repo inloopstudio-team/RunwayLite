@@ -270,6 +270,11 @@ class ChatThinkingTest < ActiveSupport::TestCase
     ].each do |model_id|
       assert_includes model_ids, model_id
     end
+  test "Top Models uses Grok 4.5 as the xAI recommendation" do
+    top_xai_model = Chat::MODELS.find { |model| model[:group] == "Top Models" && model[:model_id].start_with?("x-ai/") }
+
+    assert_equal "x-ai/grok-4.5", top_xai_model[:model_id]
+    assert_equal "grok-4.5", top_xai_model[:provider_model_id]
   end
 
   test "Top Models includes exactly one latest flagship per lab" do
@@ -282,7 +287,7 @@ class ChatThinkingTest < ActiveSupport::TestCase
       "anthropic/claude-fable-5",
       "deepseek/deepseek-v4-pro",
       "google/gemini-3.1-pro-preview",
-      "x-ai/grok-4.3",
+      "x-ai/grok-4.5",
       "mistralai/mistral-large-2512",
       "meta-llama/llama-4-maverick",
       "minimax/minimax-m3",

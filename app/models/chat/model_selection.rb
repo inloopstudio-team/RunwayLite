@@ -55,6 +55,10 @@ module Chat::ModelSelection
       group: "Top Models",
       provider_model_id: "grok-4.6",
       thinking: { supported: true }
+      model_id: "x-ai/grok-4.5",
+      label: "Grok 4.5",
+      group: "Top Models",
+      provider_model_id: "grok-4.5"
     },
     { model_id: "mistralai/mistral-large-2512", label: "Mistral Large 2512", group: "Top Models" },
     { model_id: "meta-llama/llama-4-maverick", label: "Llama 4 Maverick", group: "Top Models" },
@@ -445,6 +449,9 @@ module Chat::ModelSelection
       provider_model_id: "grok-4.6",
       thinking: { supported: true }
     },
+    {
+    # grok-4.3/4.20: Support configurable reasoning on the direct xAI API
+    # grok-4/grok-3: Built-in reasoning but not exposed/configurable
     {
       model_id: "x-ai/grok-4.5",
       label: "Grok 4.5",
