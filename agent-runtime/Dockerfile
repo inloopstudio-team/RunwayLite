@@ -7,22 +7,10 @@
 # Local build:
 #   docker build -t helixkit-agent-runtime:local agent-runtime
 
-# Pin merged subscription-auth, clamp telemetry, headless clamp, and Antigravity
-# support so hosted runtime rebuilds do not depend on movement of a branch ref.
-# Pin bumps must re-verify provider auth ceremony parsers and clamp subprocess
-# patterns in trigger_shim.py. This ref also preserves the original SQLx
-# migration checksum used by persisted Chaos journals; do not move to a ref
-# which rewrites var/proc/db/migrate/sqlite/0001_bigbang.sql.
-ARG CHAOS_REPO=https://github.com/seuros/chaos.git
-ARG CHAOS_REF=b9b28befbe64c375d6eb64cbfe397e50ce5e1f96
-
 # =============================================================================
 # Stage 1 — pull and build chaos. Source tree is discarded after the binary copies.
 # =============================================================================
-FROM rust:1.95-bookworm AS builder
-
-ARG CHAOS_REPO
-ARG CHAOS_REF
+FROM rust:1.97-bookworm AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -34,6 +22,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
     && rm -rf /var/lib/apt/lists/*
 
+# Pin to a specific chaos commit SHA for reproducibility.
+# 3c94f94e: runtime observability built on top of the merged Anthropic prompt
+# caching support. Until the observability PR is merged upstream, pin the
+# reviewed fork commit so runtime images actually emit the contract consumed by
+# trigger_shim.py and HelixKit.
+ARG CHAOS_REPO=https://github.com/swombat/chaos.git
+ARG CHAOS_REF=3c94f94e117bfd68d4db03d3a1e7d7eb4cb91c6d
 
 WORKDIR /build
 RUN git clone --filter=blob:none ${CHAOS_REPO} chaos \
@@ -51,9 +46,6 @@ RUN cargo build --release --bin chaos_journald \
 # Stage 2 — runtime
 # =============================================================================
 FROM debian:bookworm-slim AS runtime
-
-ARG CHAOS_REF
-LABEL house.souls.chaos-ref="${CHAOS_REF}"
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -86,6 +78,11 @@ VOLUME ["/home/agent/identity", "/home/agent/.chaos", "/home/agent/repo"]
 
 WORKDIR /home/agent
 ENV SHIM_PORT=4000
+# Anthropic prompt-cache TTL for chaos (PR seuros/chaos#13). Hosted agents are
+# triggered on ~hourly wake cadence and bursty conversations; the 1-hour TTL
+# keeps the cache chained across wakes (5m dies in the inter-wake gap and its
+# writes become pure loss).
+ENV CHAOS_ANTHROPIC_CACHE_TTL=1h
 EXPOSE 4000
 
 ENTRYPOINT ["tini", "--", "/usr/local/bin/entrypoint.sh"]
