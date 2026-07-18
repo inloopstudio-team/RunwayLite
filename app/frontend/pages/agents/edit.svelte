@@ -145,6 +145,7 @@
       voice_id: agent.voice_id || '',
       persistent_session: agent.persistent_session || false,
       persistent_wake_session: agent.persistent_wake_session || false,
+      scheduled_wakes_enabled: agent.scheduled_wakes_enabled ?? true,
       half_hourly_wake: agent.half_hourly_wake || false,
     },
   });
@@ -509,6 +510,20 @@
 
               <div class="flex items-center justify-between gap-6 rounded border bg-muted/30 p-4">
                 <div class="space-y-1">
+                  <Label for="scheduled_wakes_enabled">Scheduled heartbeats</Label>
+                  <p class="text-sm text-muted-foreground">
+                    Allow HelixKit to wake this agent for hourly heartbeats and any optional 30-minute heartbeats.
+                  </p>
+                </div>
+                <Switch
+                  id="scheduled_wakes_enabled"
+                  checked={$form.agent.scheduled_wakes_enabled}
+                  disabled={!runtimeManaged}
+                  onCheckedChange={(checked) => ($form.agent.scheduled_wakes_enabled = checked)} />
+              </div>
+
+              <div class="flex items-center justify-between gap-6 rounded border bg-muted/30 p-4">
+                <div class="space-y-1">
                   <Label for="persistent_session">Persistent conversation sessions</Label>
                   <p class="text-sm text-muted-foreground">
                     Resume each conversation's Chaos session and send only new transcript messages after the first turn.
@@ -526,8 +541,8 @@
                 <div class="space-y-1">
                   <Label for="persistent_wake_session">Persistent hourly heartbeat session</Label>
                   <p class="text-sm text-muted-foreground">
-                    Run hourly heartbeats in one continuing Chaos session instead of starting fresh each time.
-                    This preserves heartbeat context and allows provider caching across wakes.
+                    Run hourly heartbeats in one continuing Chaos session instead of starting fresh each time. This
+                    preserves heartbeat context and allows provider caching across wakes.
                   </p>
                 </div>
                 <Switch
@@ -547,7 +562,7 @@
                 <Switch
                   id="half_hourly_wake"
                   checked={$form.agent.half_hourly_wake}
-                  disabled={!runtimeManaged}
+                  disabled={!runtimeManaged || !$form.agent.scheduled_wakes_enabled}
                   onCheckedChange={(checked) => ($form.agent.half_hourly_wake = checked)} />
               </div>
 
