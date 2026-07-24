@@ -3,6 +3,7 @@ personal_account:
   id: 1
   name: "Test User's Account"
   account_type: 0
+  use_system_ai_credentials: true
   slug: test-users-account
   state: active
   is_site_admin: false
@@ -14,6 +15,7 @@ team_account:
   id: 2
   name: "Test Team Account"
   account_type: 1
+  use_system_ai_credentials: true
   slug: test-team-account
   state: active
   is_site_admin: false
@@ -25,6 +27,7 @@ another_team:
   id: 3
   name: "Another Team"
   account_type: 1
+  use_system_ai_credentials: true
   slug: another-team
   state: active
   is_site_admin: false
@@ -36,6 +39,7 @@ unconfirmed_user_account:
   id: 4
   name: "Unconfirmed User's Account"
   account_type: 0
+  use_system_ai_credentials: true
   slug: unconfirmed-users-account
   state: active
   is_site_admin: false
@@ -47,6 +51,7 @@ existing_user_account:
   id: 5
   name: "Existing User's Account"
   account_type: 0
+  use_system_ai_credentials: true
   slug: existing-users-account
   state: active
   is_site_admin: false
@@ -58,6 +63,7 @@ needsreset_user_account:
   id: 6
   name: "Password Reset User's Account"
   account_type: 0
+  use_system_ai_credentials: true
   slug: password-reset-users-account
   state: active
   is_site_admin: false
@@ -69,6 +75,7 @@ no_password_user_account:
   id: 7
   name: "No Password User's Account"
   account_type: 0
+  use_system_ai_credentials: true
   slug: no-password-users-account
   state: active
   is_site_admin: false
@@ -80,6 +87,7 @@ site_admin_account:
   id: 8
   name: "Site Admin's Account"
   account_type: 0
+  use_system_ai_credentials: true
   slug: site-admins-account
   state: active
   is_site_admin: true
@@ -91,6 +99,7 @@ regular_user_account:
   id: 9
   name: "Regular User's Account"
   account_type: 0
+  use_system_ai_credentials: true
   slug: regular-users-account
   state: active
   is_site_admin: false
@@ -102,6 +111,7 @@ confirmed_user_account:
   id: 10
   name: "Confirmed User's Account"
   account_type: 0
+  use_system_ai_credentials: true
   slug: confirmed-users-account
   state: active
   is_site_admin: false
@@ -113,6 +123,7 @@ team_single_user:
   id: 11
   name: "Single User Team"
   account_type: 1
+  use_system_ai_credentials: true
   slug: single-user-team
   state: active
   is_site_admin: false
@@ -125,6 +136,7 @@ team:
   id: 12
   name: "Team for Testing"
   account_type: 1
+  use_system_ai_credentials: true
   slug: team-for-testing
   state: active
   is_site_admin: false
@@ -136,6 +148,7 @@ personal:
   id: 13
   name: "Personal Account"
   account_type: 0
+  use_system_ai_credentials: true
   slug: personal-account
   state: active
   is_site_admin: false
@@ -147,6 +160,7 @@ other:
   id: 14
   name: "Other Account"
   account_type: 1
+  use_system_ai_credentials: true
   slug: other-account
   state: active
   is_site_admin: false
