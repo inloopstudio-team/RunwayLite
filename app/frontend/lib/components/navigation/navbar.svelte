@@ -112,7 +112,8 @@
         </a>
       </div>
       <div class="hidden md:flex items-center">
-        {#each links as link}
+        <!-- Remount Inertia links when their account-scoped href changes so the click handler cannot retain the previous URL. -->
+        {#each links as link (`${link.label}:${link.href}`)}
           {#if link.show}
             <Link
               href={link.href}
@@ -188,7 +189,7 @@
           <div class="md:hidden">
             <DropdownMenu.Separator />
             <DropdownMenu.Group>
-              {#each links as link}
+              {#each links as link (`${link.label}:${link.href}`)}
                 {#if link.show}
                   <DropdownMenu.Item onclick={() => router.visit(link.href)}>{link.label}</DropdownMenu.Item>
                 {/if}
