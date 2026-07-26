@@ -644,6 +644,67 @@ module Chat::ModelSelection
     grok_fast: { label: "Reasoning effort", default: "high", options: %i[low high] },
     grok_multi_agent: { label: "Reasoning effort", default: "high", options: %i[low medium high xhigh] },
     thinking_mode: { label: "Thinking mode", default: "high", options: %i[none high], labels: { none: "Off", high: "On" } }
+    openai_ultra: {
+      label: "Reasoning effort",
+      default: "medium",
+      options: %i[low medium high xhigh max ultra]
+    },
+    openai_max: {
+      label: "Reasoning effort",
+      default: "medium",
+      options: %i[low medium high xhigh max]
+    },
+    openai_xhigh: {
+      label: "Reasoning effort",
+      default: "medium",
+      options: %i[low medium high xhigh]
+    },
+    openai_legacy: {
+      label: "Reasoning effort",
+      default: "medium",
+      options: %i[minimal low medium high xhigh]
+    },
+    anthropic: {
+      label: "Effort",
+      default: "high",
+      options: %i[low medium high xhigh max]
+    },
+    anthropic_fable: {
+      label: "Effort",
+      default: "high",
+      options: %i[low medium high xhigh max ultra]
+    },
+    gemini_full: {
+      label: "Thinking level",
+      default: "medium",
+      options: %i[minimal low medium high]
+    },
+    gemini_pro: {
+      label: "Thinking level",
+      default: "high",
+      options: %i[low medium high]
+    },
+    grok: {
+      label: "Reasoning effort",
+      default: "high",
+      options: %i[none low medium high]
+    },
+    grok_fast: {
+      label: "Reasoning effort",
+      default: "high",
+      options: %i[low high]
+    },
+    grok_multi_agent: {
+      label: "Reasoning effort",
+      default: "high",
+      options: %i[low medium high xhigh]
+    },
+    thinking_mode: {
+      label: "Thinking mode",
+      default: "high",
+      options: %i[none high],
+      labels: { none: "Off", high: "On" }
+    }
   }.freeze
 
   included do
@@ -715,6 +776,7 @@ module Chat::ModelSelection
       when %r{\Aanthropic/claude-(?:sonnet-[45]|opus-[45])}
         REASONING_PROFILES[:anthropic]
       when %r{\Agoogle/gemini-(?:3\.[5-7]-flash|3\.1-flash|3-flash)}
+      when %r{\Agoogle/gemini-(?:3\.5-flash|3\.1-flash|3-flash)}
         REASONING_PROFILES[:gemini_full]
       when %r{\Agoogle/gemini-(?:3\.1-pro|3-pro)}
         REASONING_PROFILES[:gemini_pro]

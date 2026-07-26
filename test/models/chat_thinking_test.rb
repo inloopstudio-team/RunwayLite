@@ -60,6 +60,7 @@ class ChatThinkingTest < ActiveSupport::TestCase
 
   test "reasoning effort config uses thinking levels for Gemini" do
     config = Chat.reasoning_effort_config("google/gemini-3.7-flash")
+    config = Chat.reasoning_effort_config("google/gemini-3.5-flash")
 
     assert_equal "Thinking level", config[:label]
     assert_equal %w[minimal low medium high], config[:options].pluck(:value)
