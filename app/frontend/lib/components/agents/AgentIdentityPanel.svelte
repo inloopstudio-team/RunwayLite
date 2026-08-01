@@ -2,6 +2,7 @@
   import { Input } from '$lib/components/shadcn/input';
   import { Label } from '$lib/components/shadcn/label';
   import { Switch } from '$lib/components/shadcn/switch';
+  import { siteName } from '$lib/branding';
 
   let { form, identityLocked = false } = $props();
 </script>
@@ -19,8 +20,8 @@
   {#if identityLocked}
     <div class="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
       <p>
-        Identity prompts are no longer edited in RunwayLite after hosting. Review and change them in the agent
-        filesystem instead, especially <span class="font-mono text-foreground">/home/agent/identity/soul.md</span> and
+        Identity prompts are no longer edited in {$siteName} after hosting. Review and change them in the agent filesystem
+        instead, especially <span class="font-mono text-foreground">/home/agent/identity/soul.md</span> and
         <span class="font-mono text-foreground">/home/agent/identity/self-narrative.md</span>.
       </p>
       <p class="mt-2">Use the Hosting tab's filesystem browser to inspect the current files.</p>

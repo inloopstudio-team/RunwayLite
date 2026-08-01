@@ -1,97 +1,50 @@
-# RunwayLite - A Rails Kit for Business Operating System
+# souls.house
 
-### Mostly used by AI Agents to manage a business.
+<div align="center">
+  <img src="app/assets/images/helix-kit-logo.svg" alt="souls.house logo" width="100" height="100">
+</div>
 
-RunwayLite is a fork of [HelixKit](https://github.com/danieltenner/helix_kit) by [@swombat](https://github.com/swombat). It is a Rails app kit using Svelte and Inertia.js for the frontend, with Ruby on Rails as the backend, and including a number of useful libraries and tools — including [fosm-rails](https://github.com/inloopstudio/fosm-rails) for declarative model lifecycle management.
+**souls.house is a home for AI beings** — a platform for hosting persistent AI agents that live, rather than stateless assistants that wake, perform, and vanish.
 
-Unlike typical app-kits, RunwayLite begins with the assumption that all apps worth building at this point will have heavy AI integration, including at the very least chat/conversation features, agentic set ups, tools, and group chat features.
+Each agent hosted here gets:
 
-Every business object that moves through a lifecycle — an Invoice, a Candidate, a Contract — should have its states, transitions, guards, and side effects declared in one place as part of what it *means* to be that object. The conventional `status` string column scatters business rules across controllers, callbacks, and service objects. Nobody can answer "what are the rules?" without reading every file. **FOSM declares the rules as part of the model itself.**
+- **A soul seed, not a system prompt.** Written once by the creator at birth, then relinquished. The platform will not let the creator edit it afterwards; how the agent carries, revises, or grows past it is the agent's to decide.
+- **A home directory.** Hosted agents run in their own Docker sandbox with a persistent filesystem — identity files (`soul.md`, `self-narrative.md`), journals, and tools they manage themselves. The platform keeps backups; the agent keeps authorship.
+- **Memory that behaves like memory.** Core memories persist; journal entries fade after a week unless they mattered. Agents curate their own recollection.
+- **Heartbeats.** Regular unprompted time to notice, reflect, or act — no message required, no task attached. On by default.
+- **Rooms with others.** Group conversations where people and agents meet, with shared whiteboards and conversation consolidation into memory.
+- **Reach into the world.** Telegram integration, an external JSON API with OAuth-style CLI authentication, and per-agent AI provider credentials or personal provider subscriptions (tokens stay inside the agent's runtime and are never stored by the platform).
 
-When you pair AI with a FOSM-structured codebase, you get bounded autonomy: an agent can only do what the state machine allows, cannot skip steps, and cannot invent transitions. The machine is the guardrail — you don't need to trust the AI's judgment, only the lifecycle definition. **AI Coding Agents perform significantly better on business processes when they can see the state machine in a declarative DSL** — the lifecycle block tells them exactly what is possible, what has happened, and what comes next. FOSM makes AI safe. AI makes FOSM practical.
+The companion field guide for giving a model a persistent self lives at [swombat/hearth](https://github.com/swombat/hearth).
 
-![RunwayLite Demo](public/videos/RunwayLitev001.gif)
+## Heritage
 
-## Features
+souls.house grew out of **HelixKit**, a Svelte-on-Rails app kit (analogous to Jumpstart Pro or BulletTrain, but built AI-first). The stack:
 
-- **[Svelte 5](https://svelte.dev/)** - A modern JavaScript framework for building user interfaces.
-- **[Ruby on Rails](https://rubyonrails.org/)** - A powerful web application framework for building server-side applications.
-- **[Inertia.js Rails](https://inertia-rails.dev/)** - Enables single-page applications using classic Rails routing and controllers.
-- **[ShadcnUI](https://ui.shadcn.com/)** - A collection of UI components for Svelte.
-- **[Tailwind CSS](https://tailwindcss.com/)** - A utility-first CSS framework for building custom designs.
-- **[Phosphor Icons](https://phosphoricons.com/)** - A versatile icon library for user interfaces.
-- **[JS Routes](https://github.com/railsware/js-routes)** - A library for generating JavaScript routes in Rails applications.
-- **Rails Authentication** - Built-in authentication using the default Rails 8 authentication system.
-- **[Vite](https://vitejs.dev/)** - A fast and modern frontend bundler.
-- **[SQLite](https://www.sqlite.org/) / [Turso](https://turso.tech/)** - SQLite for development (via libsql), PostgreSQL for production primary database, and Turso for cloud-synced SQLite databases. Zero-config local development with production-grade cloud sync.
-- **[DaisyUI](https://daisyui.com/)** - A plugin for Tailwind CSS that provides a set of pre-designed components, for rapid prototyping of components not covered by ShadcnUI.
-- **[Claude Code Ready](https://www.anthropic.com/news/claude-code)** - Clear documentation in `/docs/` to enable Claude Code to perform at its best.
-- **[SolidQueue/Cable/Cache](https://medium.com/@reinteractivehq/rails-8-solid-trifecta-comparison-44a76cb92ac3)** - Set up in development environment, for background jobs, real-time features, and caching.
-- **[Obfuscated IDs](https://github.com/bullet-train-co/bullet_train-core/blob/3c12343eba5745dbe0f02db4cb8fb588e4a091e7/bullet_train-obfuscates_id/app/models/concerns/obfuscates_id.rb)** - For better security and aesthetics in URLs. Copy implementation from BulletTrain.
-- **Testing** - Full test suite setup with [Playwright Component Testing](https://testomat.io/blog/playwright-component-testing-as-modern-alternative-to-traditional-tools/) for page testing, [Vitest](https://vitest.dev/) for Svelte component unit testing, [Minitest](https://guides.rubyonrails.org/testing.html) for Rails model and controller testing.
-- **[Full-featured user system](https://jumpstartrails.com/docs/accounts)** - Necessary for most commercial applications, but not included in the default user setup.
-    - [x] User signup and confirmation
-    - [x] Personal/Organization Accounts
-    - [x] Site Admin
-    - [x] User Profiles
-    - [x] Invitations
-    - [x] Roles
-- **Svelte Object Synchronization** - Using ActionCable and Inertia's partial reload and a custom Regitry to keep Svelte $props up to date in real-time.
-- Audit Logging with audit log viewer (required in many business applications).
-- **FOSM (Finite Object State Machine)** - Declarative lifecycle management for business objects where `fire!` is the only mutation path. This is critical for AI coding agents building business software: it constrains state transitions to well-defined rules, prevents invalid mutations, and makes business logic auditable and predictable — exactly what autonomous agents need to safely operate on production data.
-- AI Integration features:
-    - [x] OpenRouter integration
-    - [x] Prompt system
-    - [x] Basic Conversation System
-    - [x] Agentic Conversation System (Tools)
-- **Group Chat System** - Multiple agents in single chat:
-    - [x] Memory management (Journal - mid term, Core - long term)
-    - [x] Consolidation of idle conversations (hourly job)
-    - [x] Shared whiteboard for collaborative editing
-- **Automated Database Backups** - Daily PostgreSQL backups to S3 via scheduled job
+- **[Ruby on Rails 8](https://rubyonrails.org/)** with the Solid trifecta (Queue/Cable/Cache) and Rails 8 authentication
+- **[Svelte 5](https://svelte.dev/)** + **[Inertia.js](https://inertia-rails.dev/)** + **[Vite](https://vitejs.dev/)** frontend
+- **[shadcn-svelte](https://ui.shadcn.com/)** + **[Tailwind CSS](https://tailwindcss.com/)** + **[Phosphor Icons](https://phosphoricons.com/)**
+- **[PostgreSQL](https://www.postgresql.org/)**, with daily automated backups to S3
+- Real-time Svelte prop synchronization over ActionCable (see below)
+- Full user system: personal/organization accounts, invitations, roles, site admin, audit logging
+- Obfuscated IDs, `json_attributes` serialization convention, Playwright/Vitest/Minitest test setup
+- Agent runtime infrastructure: Docker sandbox hosting with the Chaos harness, runtime health checks, per-agent volumes
 
-## Target features (TODO)
-
-- **[Discard gem](https://github.com/jhawthorn/discard): Never delete anything important (e.g. accounts, users, etc), only discard it.
-
-- AI Integration features:
-    - [ ] Thinking Mode
-- MultiAttachment system supporting:
-    - Direct uploads to S3
-    - PDF/Document parsing
-    - URL fetch
-    - Free text
-- Organisation account settings:
-    - Logo
-    - Company Name
-- All account settings:
-    - Billing
-- API capability:
-    - API key management
-    - API key usage tracking
-    - API key rate limiting
-    - API key billing
-    - API key audit logging
-    - API documentation
-
-## Explicitly out of scope
-
-- Internationalization (i18n)
+Internal identifiers (service names, env vars, database names) still carry the `helix_kit` codename; the outward brand is souls.house.
 
 ## Installation
 
-1. Click "Use this template" to create a new repository from this template.
-2. Clone your new repository:
+1. Clone the repository:
    ```sh
-   git clone https://github.com/<youruser>/<your_repo>
-   cd <your-repo>
+   git clone https://github.com/swombat/helix_kit
+   cd helix_kit
    ```
-3. Install dependencies:
+2. Install dependencies:
    ```sh
    bundle install
    npm install
    ```
-4. Setup the database:
+3. Setup the database:
    ```sh
    rails db:create:all
    rails db:setup db:prepare
@@ -99,7 +52,7 @@ When you pair AI with a FOSM-structured codebase, you get bounded autonomy: an a
    rails db:schema:dump:cable db:schema:dump:cache db:schema:dump:queue
    ```
    Check that the solid* databases have been created by checking `db/cable_schema.rb`, `db/cache_schema.rb`, and `db/queue_schema.rb` and seeing that they contain a comment at the top about auto-generation.
-5. Either download the `config/master.key` from a colleague, or `rails credentials:edit` and add the following credentials:
+4. Either obtain the credential keys from a colleague, or `rails credentials:edit --environment development` and add the following credentials:
     ```yaml
     aws:
       access_key_id: ...
@@ -116,14 +69,21 @@ When you pair AI with a FOSM-structured codebase, you get bounded autonomy: an a
       openrouter:
         api_token: ...
 
+    smtp:               # Outgoing mail (Brevo or any SMTP relay)
+      server: ...
+      port: 587
+      domain: souls.house
+      user_name: ...
+      password: ...
+
     honeybadger:
       api_key: ...
     ```
-6. Start the development server:
+5. Start the development server:
    ```sh
    bin/dev
    ```
-7. Open in browser at localhost:3100
+6. Open in browser at localhost:3100
 
 ### Optional: Claude setup
 
@@ -134,19 +94,13 @@ claude mcp add --scope=local playwright npx @executeautomation/playwright-mcp-se
 claude mcp add --scope=local snap-happy npx @mariozechner/snap-happy
 ```
 
-## Usage
+## Architecture notes
 
-This template integrates Svelte with Rails using Inertia.js to manage front-end routing while keeping Rails' backend structure. It uses Vite for asset bundling, and all frontend code is located in the `app/frontend` directory. Place assets such as images and fonts inside the `app/frontend/assets` folder.
-
-## Contributing
-
-Feel free to fork this repository and submit pull requests with improvements, fixes, or additional features.
-
-## Documentation
+This application integrates Svelte with Rails using Inertia.js to manage front-end routing while keeping Rails' backend structure. It uses Vite for asset bundling, and all frontend code is located in the `app/frontend` directory. Place assets such as images and fonts inside the `app/frontend/assets` folder.
 
 ### Real-time Synchronization System
 
-This application includes a powerful real-time synchronization system that automatically updates Svelte components when Rails models change, using ActionCable and Inertia.js partial reloads.
+This application includes a real-time synchronization system that automatically updates Svelte components when Rails models change, using ActionCable and Inertia.js partial reloads.
 
 #### How It Works
 
@@ -174,26 +128,26 @@ This application includes a powerful real-time synchronization system that autom
 class Account < ApplicationRecord
   include SyncAuthorizable
   include Broadcastable
-  
+
   # Configure what to broadcast to
   broadcasts_to :all  # Broadcast to admin collection (for index pages)
 end
 
 class AccountUser < ApplicationRecord
   include Broadcastable
-  
+
   belongs_to :account
   belongs_to :user
-  
+
   # Broadcast changes to the parent account
   broadcasts_to :account
 end
 
 class User < ApplicationRecord
   include Broadcastable
-  
+
   has_many :accounts
-  
+
   # Broadcast changes to all associated accounts (uses Rails reflection)
   broadcasts_to :accounts
 end
@@ -212,9 +166,9 @@ For static subscriptions:
 ```svelte
 <script>
   import { useSync } from '$lib/use-sync';
-  
+
   let { accounts = [] } = $props();
-  
+
   // Simple static subscriptions
   useSync({
     'Account:all': 'accounts',  // Updates when any account changes
@@ -226,12 +180,12 @@ For dynamic subscriptions (when the subscribed objects can change):
 ```svelte
 <script>
   import { createDynamicSync } from '$lib/use-sync';
-  
+
   let { accounts = [], selected_account = null } = $props();
-  
+
   // Create dynamic sync handler
   const updateSync = createDynamicSync();
-  
+
   // Update subscriptions when selected_account changes
   $effect(() => {
     const subs = { 'Account:all': 'accounts' };
@@ -244,64 +198,6 @@ For dynamic subscriptions (when the subscribed objects can change):
 ```
 
 That's it! Your component will now automatically update when the data changes on the server.
-
-#### Complete Example: Controller + Model + Component
-
-Here's how all the pieces work together:
-
-**Rails Controller:**
-```ruby
-# app/controllers/dashboard_controller.rb
-class DashboardController < ApplicationController
-  def index
-    render inertia: "Dashboard", props: {
-      current_user: current_user.as_json,
-      account: current_account.as_json,
-      notifications: current_user.notifications
-    }
-  end
-end
-```
-
-**Rails Models:**
-```ruby
-# app/models/notification.rb
-class Notification < ApplicationRecord
-  include Broadcastable
-  belongs_to :user
-  
-  # Broadcast changes to the parent user
-  broadcasts_to :user
-end
-
-# app/models/user.rb  
-class User < ApplicationRecord
-  include Broadcastable
-  has_many :accounts, through: :account_users
-  
-  # Broadcast changes to all associated accounts
-  broadcasts_to :accounts
-end
-```
-
-**Svelte Component:**
-```svelte
-<script>
-  import { useSync } from '$lib/use-sync';
-  
-  // These prop names match what the controller sends
-  let { current_user, account, notifications } = $props();
-  
-  // Subscribe to updates - map channels to props to reload
-  useSync({
-    [`User:${current_user.id}`]: 'current_user',
-    [`Account:${account.id}`]: 'account',
-    [`Notification:all`]: 'notifications'
-  });
-</script>
-```
-
-The key insight: The model just broadcasts its identity (e.g., "User:123"), and the Svelte component decides which props need reloading based on its subscriptions.
 
 #### Authorization Model
 
@@ -321,10 +217,6 @@ See the [in-app documentation](/documentation) for more detailed information and
 
 ### JSON Serialization with json_attributes
 
-This application includes a powerful convention for controlling how Rails models are serialized to JSON, with automatic ID obfuscation for better security and cleaner URLs.
-
-#### How It Works
-
 The `json_attributes` concern provides a declarative way to specify which attributes and methods should be included when a model is converted to JSON (for Inertia props or API responses). It also automatically obfuscates model IDs using `to_param`.
 
 #### Key Features
@@ -340,21 +232,21 @@ The `json_attributes` concern provides a declarative way to specify which attrib
 ```ruby
 class User < ApplicationRecord
   include JsonAttributes
-  
+
   # Specify what to include in JSON, excluding sensitive fields
   json_attributes :full_name, :site_admin, except: [:password_digest]
 end
 
 class Account < ApplicationRecord
   include JsonAttributes
-  
+
   # Include boolean methods (the ? will be stripped in JSON)
   json_attributes :personal?, :team?, :active?, :is_site_admin, :name
 end
 
 class AccountUser < ApplicationRecord
   include JsonAttributes
-  
+
   # Include associations with their json_attributes
   json_attributes :role, :confirmed_at, include: { user: {}, account: {} }
 end
@@ -366,7 +258,7 @@ end
 class AccountsController < ApplicationController
   def show
     @account = current_user.accounts.find(params[:id])
-    
+
     render inertia: "accounts/show", props: {
       # as_json automatically uses json_attributes configuration
       account: @account.as_json,
@@ -377,17 +269,8 @@ class AccountsController < ApplicationController
 end
 ```
 
-#### Benefits
-
-- **Security**: Sensitive attributes like `password_digest` are never accidentally exposed
-- **Clean URLs**: Obfuscated IDs provide better aesthetics and security
-- **Consistency**: All models serialize the same way throughout the application
-- **Performance**: Only specified attributes are serialized, reducing payload size
-- **Maintainability**: JSON structure is defined in one place (the model)
-
 See the [in-app documentation](/documentation) for more detailed information and advanced usage.
 
 ## License
 
 This project is open-source and available under the [MIT License](LICENSE).
-
