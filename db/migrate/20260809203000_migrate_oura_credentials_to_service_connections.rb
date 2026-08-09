@@ -1,9 +1,9 @@
 class MigrateOuraCredentialsToServiceConnections < ActiveRecord::Migration[8.1]
 
   def up
-    # no-op: ServiceConnection model does not exist in talkyform;
-    # this migration is from helix_kit's service_connections refactor.
-    return
+    OuraIntegration.reset_column_information
+    ServiceConnection.reset_column_information
+    AgentServiceAccess.reset_column_information
 
     OuraIntegration.includes(user: :accounts).find_each do |integration|
       next if integration.access_token.blank? && integration.refresh_token.blank?
@@ -40,10 +40,7 @@ class MigrateOuraCredentialsToServiceConnections < ActiveRecord::Migration[8.1]
         freely_provisionable: nexus_account?(account)
       )
       connection.credential_payload_hash = payload
-      # This migration runs before credential_fingerprint is added. Skip the
-      # current model's validations so restoring an older database does not
-      # invoke validations for columns that do not exist at this schema version.
-      connection.save!(validate: false)
+      connection.save!
 
       unless connection.reload.credential_payload_hash.slice("access_token", "refresh_token") ==
              payload.slice("access_token", "refresh_token")
