@@ -2,9 +2,17 @@ module Api
   module V1
     class ConversationsController < BaseController
 
+      PAGE_SIZE = 100
+
       def index
-        chats = conversations_scope.kept.active.latest.limit(100)
-        render json: { conversations: chats.map { |c| conversation_json(c) } }
+        chats = paginated_conversations.limit(PAGE_SIZE + 1).to_a
+        next_cursor = chats.length > PAGE_SIZE ? chats[PAGE_SIZE - 1].to_param : nil
+        chats = chats.first(PAGE_SIZE)
+
+        render json: {
+          conversations: chats.map { |chat| conversation_json(chat) },
+          next_cursor: next_cursor
+        }
       end
 
       def show
@@ -18,7 +26,7 @@ module Api
             agents: chat.group_chat? ? chat.agents.map { |a| { id: a.to_param, name: a.name } } : [],
             created_at: chat.created_at.iso8601,
             updated_at: chat.updated_at.iso8601,
-            transcript: chat.transcript_for_api
+            transcript: chat.transcript_for_api(after_message_id: resolved_after_message_id, since: params[:since])
           }
         }
       end
@@ -73,6 +81,24 @@ module Api
         return current_api_agent.chats if current_api_agent
 
         current_api_account.chats
+      end
+
+      def paginated_conversations
+        scope = conversations_scope.kept.active.reorder(updated_at: :desc, id: :desc)
+        return scope if params[:cursor].blank?
+
+        cursor = conversations_scope.find(params[:cursor])
+        scope.where(
+          "chats.updated_at < :updated_at OR (chats.updated_at = :updated_at AND chats.id < :id)",
+          updated_at: cursor.updated_at,
+          id: cursor.id
+        )
+      end
+
+      def resolved_after_message_id
+        return nil if params[:after_message_id].blank?
+
+        Message.decode_id(params[:after_message_id])
       end
 
       def create_agent_scoped_conversation!
