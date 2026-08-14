@@ -38,14 +38,13 @@ module Chat::ModelSelection
       model_id: "deepseek/deepseek-v4-pro",
       label: "DeepSeek V4 Pro",
       group: "Top Models",
-      provider_model_id: "deepseek-v4-pro",
-      thinking: { supported: true, requires_direct_api: true }
+      thinking: { supported: true }
     },
     {
-      model_id: "google/gemini-3.1-pro-preview",
-      label: "Gemini 3.1 Pro",
+      model_id: "google/gemini-3.7-flash",
+      label: "Gemini 3.7 Flash",
       group: "Top Models",
-      provider_model_id: "gemini-3.1-pro-preview",
+      provider_model_id: "gemini-3.7-flash",
       thinking: { supported: true },
       audio_input: true
     },
@@ -58,7 +57,8 @@ module Chat::ModelSelection
       model_id: "x-ai/grok-4.5",
       label: "Grok 4.5",
       group: "Top Models",
-      provider_model_id: "grok-4.5"
+      provider_model_id: "grok-4.6",
+      thinking: { supported: true }
     },
     { model_id: "mistralai/mistral-large-2512", label: "Mistral Large 2512", group: "Top Models" },
     { model_id: "meta-llama/llama-4-maverick", label: "Llama 4 Maverick", group: "Top Models" },
@@ -452,6 +452,13 @@ module Chat::ModelSelection
     {
     # grok-4.3/4.20: Support configurable reasoning on the direct xAI API
     # grok-4/grok-3: Built-in reasoning but not exposed/configurable
+    {
+      model_id: "x-ai/grok-4.6",
+      label: "Grok 4.6",
+      group: "xAI",
+      provider_model_id: "grok-4.6",
+      thinking: { supported: true }
+    },
     {
       model_id: "x-ai/grok-4.5",
       label: "Grok 4.5",
