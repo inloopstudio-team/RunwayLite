@@ -27,7 +27,7 @@ if defined?(Libsql::Rows)
     def to_a
       super.map do |row|
         row.transform_values do |v|
-          v.is_a?(String) && v.encoding == Encoding::ASCII_8BIT ? v.encode("UTF-8", invalid: :replace, undef: :replace) : v
+          v.is_a?(String) && v.encoding == Encoding::ASCII_8BIT ? v.force_encoding("UTF-8") : v
         end
       end
     end
