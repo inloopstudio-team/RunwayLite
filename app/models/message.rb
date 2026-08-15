@@ -1,8 +1,6 @@
 class Message < ApplicationRecord
 
   serialize :tools_used, coder: JSON
-  serialize :moderation_scores, coder: JSON
-  serialize :replay_payload, coder: JSON
 
   include Broadcastable
   include ObfuscatesId
@@ -13,6 +11,8 @@ class Message < ApplicationRecord
   include Message::Moderatable
   include Message::Replayable
   include Message::Streamable
+
+  acts_as_message model: :ai_model, model_class: "AiModel", model_foreign_key: :ai_model_id
 
   belongs_to :ai_model, class_name: "AiModel", optional: true
   has_many :tool_calls, dependent: :destroy

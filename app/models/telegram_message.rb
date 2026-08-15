@@ -15,6 +15,7 @@ class TelegramMessage < ApplicationRecord
   has_one_attached :media
   has_many_attached :preview_frames
 
+
   validates :role, inclusion: { in: %w[user assistant] }
   validates :text, presence: true
   validates :sent_at, presence: true

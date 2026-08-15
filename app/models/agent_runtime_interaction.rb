@@ -7,6 +7,8 @@ class AgentRuntimeInteraction < ApplicationRecord
 
   belongs_to :agent
   belongs_to :chat, optional: true
+
+
   after_commit :broadcast_agent_runtime_interactions_refresh, on: [ :create, :update, :destroy ]
 
   validates :trigger_kind, presence: true

@@ -6,7 +6,7 @@ module Chat::ModelSelection
   # Model IDs from OpenRouter API: https://openrouter.ai/api/v1/models
   # provider_model_id: the model ID used when calling the provider's direct API
   MODELS = [
-    # Top Models - One flagship per major provider
+    # Top Models - Flagship from each major provider
     {
       model_id: "openai/gpt-5.6-sol",
       label: "GPT-5.6 Sol",
@@ -31,20 +31,6 @@ module Chat::ModelSelection
       label: "Gemini 3.7 Flash",
       group: "Top Models",
       provider_model_id: "gemini-3.7-flash",
-      group: "Top Models",
-      provider_model_id: "claude-fable-5"
-    },
-    {
-      model_id: "deepseek/deepseek-v4-pro",
-      label: "DeepSeek V4 Pro",
-      group: "Top Models",
-      thinking: { supported: true }
-    },
-    {
-      model_id: "google/gemini-3.7-flash",
-      label: "Gemini 3.7 Flash",
-      group: "Top Models",
-      provider_model_id: "gemini-3.7-flash",
       thinking: { supported: true },
       audio_input: true
     },
@@ -54,19 +40,12 @@ module Chat::ModelSelection
       group: "Top Models",
       provider_model_id: "grok-4.6",
       thinking: { supported: true }
-      model_id: "x-ai/grok-4.5",
-      label: "Grok 4.5",
-      group: "Top Models",
-      provider_model_id: "grok-4.6",
-      thinking: { supported: true }
     },
     { model_id: "mistralai/mistral-large-2512", label: "Mistral Large 2512", group: "Top Models" },
     { model_id: "meta-llama/llama-4-maverick", label: "Llama 4 Maverick", group: "Top Models" },
     { model_id: "minimax/minimax-m3", label: "MiniMax M3", group: "Top Models", thinking: { supported: true } },
     { model_id: "moonshotai/kimi-k3", label: "Kimi K3", group: "Top Models", thinking: { supported: true } },
     { model_id: "qwen/qwen3.8-max", label: "Qwen3.8 Max", group: "Top Models", thinking: { supported: true } },
-    { model_id: "moonshotai/kimi-k2.7-code", label: "Kimi K2.7 Code", group: "Top Models" },
-    { model_id: "qwen/qwen3.7-max", label: "Qwen3.7 Max", group: "Top Models", thinking: { supported: true } },
     { model_id: "z-ai/glm-5.2", label: "GLM 5.2", group: "Top Models", thinking: { supported: true } },
 
     # OpenAI
@@ -450,16 +429,6 @@ module Chat::ModelSelection
       thinking: { supported: true }
     },
     {
-    # grok-4.3/4.20: Support configurable reasoning on the direct xAI API
-    # grok-4/grok-3: Built-in reasoning but not exposed/configurable
-    {
-      model_id: "x-ai/grok-4.6",
-      label: "Grok 4.6",
-      group: "xAI",
-      provider_model_id: "grok-4.6",
-      thinking: { supported: true }
-    },
-    {
       model_id: "x-ai/grok-4.5",
       label: "Grok 4.5",
       group: "xAI",
@@ -639,18 +608,6 @@ module Chat::ModelSelection
   }.freeze
 
   REASONING_PROFILES = {
-    openai_ultra: { label: "Reasoning effort", default: "medium", options: %i[low medium high xhigh max ultra] },
-    openai_max: { label: "Reasoning effort", default: "medium", options: %i[low medium high xhigh max] },
-    openai_xhigh: { label: "Reasoning effort", default: "medium", options: %i[low medium high xhigh] },
-    openai_legacy: { label: "Reasoning effort", default: "medium", options: %i[minimal low medium high xhigh] },
-    anthropic: { label: "Effort", default: "high", options: %i[low medium high xhigh max] },
-    anthropic_fable: { label: "Effort", default: "high", options: %i[low medium high xhigh max ultra] },
-    gemini_full: { label: "Thinking level", default: "medium", options: %i[minimal low medium high] },
-    gemini_pro: { label: "Thinking level", default: "high", options: %i[low medium high] },
-    grok: { label: "Reasoning effort", default: "high", options: %i[none low medium high] },
-    grok_fast: { label: "Reasoning effort", default: "high", options: %i[low high] },
-    grok_multi_agent: { label: "Reasoning effort", default: "high", options: %i[low medium high xhigh] },
-    thinking_mode: { label: "Thinking mode", default: "high", options: %i[none high], labels: { none: "Off", high: "On" } }
     openai_ultra: {
       label: "Reasoning effort",
       default: "medium",
@@ -783,7 +740,6 @@ module Chat::ModelSelection
       when %r{\Aanthropic/claude-(?:sonnet-[45]|opus-[45])}
         REASONING_PROFILES[:anthropic]
       when %r{\Agoogle/gemini-(?:3\.[5-7]-flash|3\.1-flash|3-flash)}
-      when %r{\Agoogle/gemini-(?:3\.5-flash|3\.1-flash|3-flash)}
         REASONING_PROFILES[:gemini_full]
       when %r{\Agoogle/gemini-(?:3\.1-pro|3-pro)}
         REASONING_PROFILES[:gemini_pro]
@@ -803,18 +759,6 @@ module Chat::ModelSelection
   # (RubyLLM's version returns ai_model&.model_id which is nil before save)
   def model_id
     model_id_string_value
-  end
-
-  def model_id=(value)
-    @model_string = value
-  end
-
-  def provider=(value)
-    @provider_override = value
-  end
-
-  def assume_model_exists=(value)
-    @assume_model_exists = value
   end
 
   def model_label

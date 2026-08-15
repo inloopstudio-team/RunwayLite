@@ -11,6 +11,8 @@ class Chat < ApplicationRecord
   include Chat::Forkable
   include Chat::Initiable
 
+  acts_as_chat model: :ai_model, model_class: "AiModel", model_foreign_key: :ai_model_id
+
   belongs_to :ai_model, class_name: "AiModel", optional: true
   has_many :messages, dependent: :destroy
 

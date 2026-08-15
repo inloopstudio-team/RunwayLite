@@ -9,6 +9,7 @@ class ServiceConnection < ApplicationRecord
   has_many :agent_service_accesses, dependent: :destroy
   has_many :agents, through: :agent_service_accesses
 
+
   encrypts :credential_payload
 
   validates :provider, :management_scope, :credential_kind, :status, presence: true

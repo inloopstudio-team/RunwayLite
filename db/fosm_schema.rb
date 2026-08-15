@@ -11,19 +11,4 @@
 # It's strongly recommended that you check this file into your version control system.
 
 ActiveRecord::Schema[8.1].define(version: 2026_06_05_103848) do
-# Could not dump table "fosm_access_events" because of following NameError
-#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
-
-
-# Could not dump table "fosm_role_assignments" because of following NameError
-#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
-
-
-# Could not dump table "fosm_transition_logs" because of following NameError
-#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
-
-
-# Could not dump table "fosm_webhook_subscriptions" because of following NameError
-#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
-
 end

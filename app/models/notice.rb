@@ -6,6 +6,7 @@ class Notice < ApplicationRecord
   belongs_to :account, optional: true
   belongs_to :created_by, class_name: "User", optional: true
 
+
   validates :scope, inclusion: { in: SCOPES }
   validates :notice_type, inclusion: { in: TYPES }
   validates :expires_at, presence: true

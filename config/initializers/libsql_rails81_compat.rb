@@ -20,6 +20,7 @@
 # 12. begin/commit/rollback_db_transaction are no-ops in AbstractAdapter; implement for libsql
 # 13. translate_exception: libsql raises RuntimeError for constraint violations; map to AR exceptions
 # 14. add_foreign_key unsupported on existing tables in SQLite; make it a no-op
+# 15. :jsonb is PostgreSQL-only; alias to :json so shared migrations run on libSQL
 
 # Fix 9: libsql returns strings with ASCII-8BIT encoding; force UTF-8 at result time.
 if defined?(Libsql::Rows)
@@ -117,6 +118,11 @@ if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
 
     def foreign_keys(table_name, name: nil)
       []
+    end
+
+    # Fix 15: :jsonb is PostgreSQL-only. Alias to :json so shared migrations run on libSQL.
+    def type_to_sql(type, limit: nil, precision: nil, scale: nil, **)
+      super(type.to_sym == :jsonb ? :json : type, limit: limit, precision: precision, scale: scale)
     end
 
     # Fix 10 (PATCH 1): Declare full SQLite capability set so Rails doesn't
@@ -266,6 +272,44 @@ if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
       when /\A-?\d+(\.\d*)?\z/ then ::Regexp.last_match(0)
       when /x'(.*)'/ then [ ::Regexp.last_match(1) ].pack("H*")
       end
+    end
+  end
+
+  # Fix 15 (cont): patch the migration DSL objects so `t.jsonb` and
+  # `t.add_column ..., :jsonb` resolve to :text on libSQL.
+  [ ActiveRecord::ConnectionAdapters::TableDefinition,
+    ActiveRecord::ConnectionAdapters::Table ].each do |klass|
+    klass.class_eval do
+      def jsonb(name, **options)
+        options[:default] = options[:default].to_json if options[:default].is_a?(Array) || options[:default].is_a?(Hash)
+        column(name, :json, **options)
+      end
+    end
+  end
+
+  # Fix 17: remove_index generates "DROP INDEX name ON table" — SQLite syntax is
+  # "DROP INDEX name" with no ON clause. Intercept and issue correct SQL.
+  ActiveRecord::ConnectionAdapters::LibsqlAdapter.class_eval do
+    def remove_index(table_name, column_name = nil, **options)
+      index_name = options[:name] || index_name(table_name, column_name)
+      execute("DROP INDEX IF EXISTS #{quote_column_name(index_name)}")
+    end
+  end
+
+  # Fix 16: SQLite does not support ALTER TABLE ... ALTER COLUMN for nullability.
+  # change_column_null is a no-op — constraints are enforced at the app layer.
+  # Also: add_column with :jsonb type needs Hash/Array defaults serialized to JSON.
+  ActiveRecord::ConnectionAdapters::LibsqlAdapter.class_eval do
+    def change_column_null(table_name, column_name, null, default = nil)
+      # no-op: SQLite cannot alter column constraints after creation
+    end
+
+    def add_column(table_name, column_name, type, **options)
+      if type.to_sym == :jsonb
+        type = :json
+        options[:default] = options[:default].to_json if options[:default].is_a?(Array) || options[:default].is_a?(Hash)
+      end
+      super(table_name, column_name, type, **options)
     end
   end
 end

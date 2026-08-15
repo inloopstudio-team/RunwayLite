@@ -21,6 +21,7 @@ class Agent < ApplicationRecord
   has_many :agent_service_accesses, dependent: :destroy
   has_many :service_connections, through: :agent_service_accesses
 
+
   VALID_COLOURS = %w[
     slate gray zinc neutral stone
     red orange amber yellow lime green

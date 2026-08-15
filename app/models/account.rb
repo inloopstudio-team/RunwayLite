@@ -62,6 +62,7 @@ class Account < ApplicationRecord
   has_one :github_integration
   has_one :x_integration
 
+
   # Validations (Rails-only, no SQL constraints!)
   validates :name, presence: true
   validates :account_type, presence: true

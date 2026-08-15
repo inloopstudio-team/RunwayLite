@@ -26,6 +26,17 @@ module HelixKit
     # config.eager_load_paths << Rails.root.join("extras")
     #
     ## Disable unnecessary files when generating
+    # Ensure new RubyLLM ActsAs API (with model:, model_class: kwargs) is
+    # included in ActiveRecord::Base before models are eager-loaded, regardless
+    # of when the RubyLLM Railtie's on_load(:active_record) fires relative to
+    # the config/initializers/00_ruby_llm.rb that sets use_new_acts_as = true.
+    config.to_prepare do
+      require "ruby_llm/active_record/acts_as"
+      unless ActiveRecord::Base.ancestors.include?(RubyLLM::ActiveRecord::ActsAs)
+        ActiveRecord::Base.include RubyLLM::ActiveRecord::ActsAs
+      end
+    end
+
     config.generators do |g|
       g.helper false               # No helper files
       g.assets false               # No CSS/JS assets

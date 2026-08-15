@@ -1,6 +1,5 @@
 class ChatAgent < ApplicationRecord
 
-  serialize :borrowed_context_json, coder: JSON
 
   SUMMARY_COOLDOWN = 5.minutes
 

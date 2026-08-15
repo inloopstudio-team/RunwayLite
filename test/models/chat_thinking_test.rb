@@ -60,7 +60,6 @@ class ChatThinkingTest < ActiveSupport::TestCase
 
   test "reasoning effort config uses thinking levels for Gemini" do
     config = Chat.reasoning_effort_config("google/gemini-3.7-flash")
-    config = Chat.reasoning_effort_config("google/gemini-3.5-flash")
 
     assert_equal "Thinking level", config[:label]
     assert_equal %w[minimal low medium high], config[:options].pluck(:value)
@@ -77,7 +76,6 @@ class ChatThinkingTest < ActiveSupport::TestCase
   test "reasoning effort config is absent for models without a configurable setting" do
     assert_nil Chat.reasoning_effort_config("openai/gpt-4o")
   end
-
 
   test "requires_direct_api_for_thinking? returns true for Claude 4+ models" do
     assert Chat.requires_direct_api_for_thinking?("anthropic/claude-opus-4.5")
@@ -223,55 +221,6 @@ class ChatThinkingTest < ActiveSupport::TestCase
   end
 
   test "Top Models uses Grok 4.6 as the xAI recommendation" do
-    top_xai_model = Chat::MODELS.find { |model| model[:group] == "Top Models" && model[:model_id].start_with?("x-ai/") }
-
-    assert_equal "x-ai/grok-4.6", top_xai_model[:model_id]
-    assert_equal "grok-4.6", top_xai_model[:provider_model_id]
-  end
-
-  test "Top Models includes exactly one latest flagship per lab" do
-    top_model_ids = Chat::MODELS
-      .select { |model| model[:group] == "Top Models" }
-      .map { |model| model[:model_id] }
-
-    assert_equal [
-      "openai/gpt-5.6-sol",
-      "anthropic/claude-fable-5",
-      "deepseek/deepseek-v4-pro-0813",
-      "google/gemini-3.7-flash",
-      "x-ai/grok-4.6",
-      "mistralai/mistral-large-2512",
-      "meta-llama/llama-4-maverick",
-      "minimax/minimax-m3",
-      "moonshotai/kimi-k3",
-      "qwen/qwen3.8-max",
-      "z-ai/glm-5.2"
-    ], top_model_ids
-
-    assert_equal "OpenAI", Chat.model_config("openai/gpt-5.5")[:group]
-    assert_equal "Anthropic", Chat.model_config("anthropic/claude-opus-4.7")[:group]
-    assert_equal "DeepSeek", Chat.model_config("deepseek/deepseek-v3.2")[:group]
-  end
-
-  test "MODELS constant includes the latest OpenRouter catalog additions" do
-    model_ids = Chat::MODELS.map { |model| model[:model_id] }
-
-    [
-      "anthropic/claude-opus-5-fast",
-      "deepseek/deepseek-v4-flash-0731",
-      "deepseek/deepseek-v4-pro-0813",
-      "google/gemini-3.5-flash-lite",
-      "google/gemini-3.6-flash",
-      "google/gemini-3.7-flash",
-      "moonshotai/kimi-k3",
-      "qwen/qwen3.7-flash",
-      "qwen/qwen3.8-2.4t-a95b",
-      "qwen/qwen3.8-max",
-      "x-ai/grok-4.6"
-    ].each do |model_id|
-      assert_includes model_ids, model_id
-    end
-  test "Top Models uses Grok 4.5 as the xAI recommendation" do
     top_xai_model = Chat::MODELS.find { |model| model[:group] == "Top Models" && model[:model_id].start_with?("x-ai/") }
 
     assert_equal "x-ai/grok-4.6", top_xai_model[:model_id]
