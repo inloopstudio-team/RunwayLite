@@ -26,15 +26,13 @@ module HelixKit
     # config.eager_load_paths << Rails.root.join("extras")
     #
     ## Disable unnecessary files when generating
-    # Ensure new RubyLLM ActsAs API (with model:, model_class: kwargs) is
-    # included in ActiveRecord::Base before models are eager-loaded, regardless
-    # of when the RubyLLM Railtie's on_load(:active_record) fires relative to
-    # the config/initializers/00_ruby_llm.rb that sets use_new_acts_as = true.
-    config.to_prepare do
-      require "ruby_llm/active_record/acts_as"
-      unless ActiveRecord::Base.ancestors.include?(RubyLLM::ActiveRecord::ActsAs)
-        ActiveRecord::Base.include RubyLLM::ActiveRecord::ActsAs
-      end
+    # Set use_new_acts_as BEFORE ruby_llm.active_record initializer fires its
+    # on_load(:active_record) hook. fosm-rails triggers eager_load! in its own
+    # to_prepare callback (which runs before ours), so to_prepare is too late.
+    # Running before "ruby_llm.active_record" ensures the Railtie itself includes
+    # ActsAs (new API) rather than ActsAsLegacy, before any model is loaded.
+    initializer "app.ruby_llm_new_acts_as", before: "ruby_llm.active_record" do
+      RubyLLM.config.use_new_acts_as = true
     end
 
     config.generators do |g|
