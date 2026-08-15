@@ -1,8 +1,6 @@
 class AuditLog < ApplicationRecord
-  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
-  serialize :data, coder: JSON
-  end
 
+  serialize :data, coder: JSON
 
   include ObfuscatesId
   include SyncAuthorizable

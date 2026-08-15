@@ -1,7 +1,4 @@
 class TelegramMessage < ApplicationRecord
-  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
-  serialize :media_metadata, coder: JSON
-  end
 
   include ObfuscatesId
 

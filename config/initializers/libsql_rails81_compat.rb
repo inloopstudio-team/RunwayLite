@@ -281,7 +281,8 @@ if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
     ActiveRecord::ConnectionAdapters::Table ].each do |klass|
     klass.class_eval do
       def jsonb(name, **options)
-        options[:default] = options[:default].to_json if options[:default].is_a?(Array) || options[:default].is_a?(Hash)
+        # Do NOT pre-serialize the default — let the :json AR type handle it.
+        # Pre-serializing causes double-encoding: {}.to_json → "{}" → JSON.encode("{}") → "\"{}\""
         column(name, :json, **options)
       end
     end
@@ -307,7 +308,8 @@ if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
     def add_column(table_name, column_name, type, **options)
       if type.to_sym == :jsonb
         type = :json
-        options[:default] = options[:default].to_json if options[:default].is_a?(Array) || options[:default].is_a?(Hash)
+        # Do NOT pre-serialize the default — let the :json AR type handle it.
+        # Pre-serializing causes double-encoding: {}.to_json → "{}" → JSON.encode("{}") → "\"{}\""
       end
       super(table_name, column_name, type, **options)
     end

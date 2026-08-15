@@ -1,7 +1,5 @@
 class GithubIntegration < ApplicationRecord
-  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
   serialize :recent_commits, coder: JSON
-  end
 
 
   include GithubApi

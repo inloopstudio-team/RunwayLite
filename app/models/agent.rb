@@ -1,4 +1,5 @@
 class Agent < ApplicationRecord
+  serialize :enabled_tools, coder: JSON
 
   include ActionView::Helpers::DateHelper
   include Broadcastable
@@ -13,11 +14,6 @@ class Agent < ApplicationRecord
   include Agent::Tools
 
   belongs_to :account
-  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
-  serialize :enabled_tools, coder: JSON
-  serialize :provider_auth_modes, coder: JSON
-  serialize :provider_connections, coder: JSON
-  end
   belongs_to :outbound_api_key, class_name: "ApiKey", optional: true
   has_many :chat_agents, dependent: :destroy
   has_many :agent_backup_snapshots, dependent: :destroy

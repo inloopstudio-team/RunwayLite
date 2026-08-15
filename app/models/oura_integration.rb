@@ -1,7 +1,5 @@
 class OuraIntegration < ApplicationRecord
-  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
   serialize :health_data, coder: JSON
-  end
 
 
   include OuraApi

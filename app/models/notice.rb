@@ -1,7 +1,4 @@
 class Notice < ApplicationRecord
-  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
-  serialize :params, coder: JSON
-  end
 
   SCOPES = %w[system account].freeze
   TYPES = %w[model_changed site_renamed announcement].freeze
