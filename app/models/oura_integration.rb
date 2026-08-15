@@ -1,5 +1,7 @@
 class OuraIntegration < ApplicationRecord
 
+  serialize :health_data, coder: JSON
+
   include OuraApi
 
   belongs_to :user

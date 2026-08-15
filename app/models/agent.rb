@@ -32,6 +32,8 @@ class Agent < ApplicationRecord
     Butterfly Flower Tree Leaf
   ].freeze
 
+  serialize :enabled_tools, coder: JSON
+
   EXTERNALLY_MANAGED_ATTRIBUTES = %w[
     name system_prompt reflection_prompt memory_reflection_prompt
     summary_prompt refinement_prompt refinement_threshold

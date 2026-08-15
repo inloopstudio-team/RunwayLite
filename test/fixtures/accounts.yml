@@ -4,6 +4,9 @@ personal_account:
   name: "Test User's Account"
   account_type: 0
   slug: test-users-account
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 1.day.ago %>
   updated_at: <%= 1.day.ago %>
 
@@ -12,6 +15,9 @@ team_account:
   name: "Test Team Account"
   account_type: 1
   slug: test-team-account
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 1.day.ago %>
   updated_at: <%= 1.day.ago %>
 
@@ -20,6 +26,9 @@ another_team:
   name: "Another Team"
   account_type: 1
   slug: another-team
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 2.days.ago %>
   updated_at: <%= 2.days.ago %>
 
@@ -28,6 +37,9 @@ unconfirmed_user_account:
   name: "Unconfirmed User's Account"
   account_type: 0
   slug: unconfirmed-users-account
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 1.hour.ago %>
   updated_at: <%= 1.hour.ago %>
 
@@ -36,6 +48,9 @@ existing_user_account:
   name: "Existing User's Account"
   account_type: 0
   slug: existing-users-account
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 2.days.ago %>
   updated_at: <%= 2.days.ago %>
 
@@ -44,6 +59,9 @@ needsreset_user_account:
   name: "Password Reset User's Account"
   account_type: 0
   slug: password-reset-users-account
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 1.day.ago %>
   updated_at: <%= 1.day.ago %>
 
@@ -52,6 +70,9 @@ no_password_user_account:
   name: "No Password User's Account"
   account_type: 0
   slug: no-password-users-account
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 1.day.ago %>
   updated_at: <%= 1.day.ago %>
 
@@ -60,6 +81,9 @@ site_admin_account:
   name: "Site Admin's Account"
   account_type: 0
   slug: site-admins-account
+  state: active
+  is_site_admin: true
+  settings: "{}"
   created_at: <%= 3.days.ago %>
   updated_at: <%= 3.days.ago %>
 
@@ -68,6 +92,9 @@ regular_user_account:
   name: "Regular User's Account"
   account_type: 0
   slug: regular-users-account
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 2.days.ago %>
   updated_at: <%= 2.days.ago %>
 
@@ -76,6 +103,9 @@ confirmed_user_account:
   name: "Confirmed User's Account"
   account_type: 0
   slug: confirmed-users-account
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 3.days.ago %>
   updated_at: <%= 3.days.ago %>
 
@@ -84,6 +114,9 @@ team_single_user:
   name: "Single User Team"
   account_type: 1
   slug: single-user-team
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 1.day.ago %>
   updated_at: <%= 1.day.ago %>
 
@@ -93,6 +126,9 @@ team:
   name: "Team for Testing"
   account_type: 1
   slug: team-for-testing
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 1.day.ago %>
   updated_at: <%= 1.day.ago %>
 
@@ -101,6 +137,9 @@ personal:
   name: "Personal Account"
   account_type: 0
   slug: personal-account
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 1.day.ago %>
   updated_at: <%= 1.day.ago %>
 
@@ -109,5 +148,8 @@ other:
   name: "Other Account"
   account_type: 1
   slug: other-account
+  state: active
+  is_site_admin: false
+  settings: "{}"
   created_at: <%= 1.day.ago %>
   updated_at: <%= 1.day.ago %>

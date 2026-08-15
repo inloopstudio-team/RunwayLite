@@ -6,7 +6,7 @@ class CreateMessages < ActiveRecord::Migration[8.0]
       t.belongs_to :user, null: true, foreign_key: true # nil for AI messages
       t.string :role, null: false # 'user', 'assistant', 'system'
       t.text :content
-      t.string :model_id_string
+      t.string :model_id
       t.integer :input_tokens
       t.integer :output_tokens
       t.references :tool_call

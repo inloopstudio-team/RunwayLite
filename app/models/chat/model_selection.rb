@@ -507,6 +507,18 @@ module Chat::ModelSelection
     model_id_string_value
   end
 
+  def model_id=(value)
+    @model_string = value
+  end
+
+  def provider=(value)
+    @provider_override = value
+  end
+
+  def assume_model_exists=(value)
+    @assume_model_exists = value
+  end
+
   def model_label
     model = self.class.model_config(model_id_string_value)
     model ? model[:label] : model_id_string_value

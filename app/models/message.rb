@@ -1,5 +1,9 @@
 class Message < ApplicationRecord
 
+  serialize :tools_used, coder: JSON
+  serialize :moderation_scores, coder: JSON
+  serialize :replay_payload, coder: JSON
+
   include Broadcastable
   include ObfuscatesId
   include JsonAttributes
@@ -48,7 +52,7 @@ class Message < ApplicationRecord
 
     joins(:chat)
       .where(chats: { account_id: account.id, discarded_at: nil })
-      .where("messages.content ILIKE ?", "%#{sanitize_sql_like(query)}%")
+      .where("LOWER(messages.content) LIKE LOWER(?)", "%#{sanitize_sql_like(query)}%")
       .where(role: %w[user assistant])
       .includes(:chat, :user, :agent)
       .order(created_at: :desc)

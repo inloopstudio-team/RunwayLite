@@ -1,5 +1,7 @@
 class AgentRuntimeInteraction < ApplicationRecord
 
+  serialize :response_body, coder: JSON
+
   belongs_to :agent
   belongs_to :chat, optional: true
   after_commit :broadcast_agent_runtime_interactions_refresh, on: [ :create, :update, :destroy ]

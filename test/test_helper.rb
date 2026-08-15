@@ -33,8 +33,9 @@ module ActiveSupport
     # Include ActiveJob test helpers for testing enqueued jobs
     include ActiveJob::TestHelper
 
-    # Run tests in parallel with specified workers
-    parallelize(workers: :number_of_processors)
+    # libSQL/SQLite does not support concurrent writers — run tests serially
+    parallelize(workers: 1)
+    self.use_transactional_tests = true
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all

@@ -22,7 +22,9 @@ class CreateAiModels < ActiveRecord::Migration[8.1]
       t.index :family
     end
 
-    # libsql does not support rename_column; columns already named model_id_string in create migrations
+    # SQLite 3.25+ supports RENAME COLUMN; use raw SQL instead of rename_column
+    execute "ALTER TABLE chats RENAME COLUMN model_id TO model_id_string"
+    execute "ALTER TABLE messages RENAME COLUMN model_id TO model_id_string"
 
     # Add foreign key references to ai_models
     add_reference :chats, :ai_model, foreign_key: true

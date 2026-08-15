@@ -81,7 +81,7 @@ class RefinementTool < RubyLLM::Tool
     return param_error("search", "query") if query.blank?
 
     results = @agent.memories.kept
-                    .where("content ILIKE ?", "%#{AgentMemory.sanitize_sql_like(query)}%")
+                    .where("LOWER(content) LIKE LOWER(?)", "%#{AgentMemory.sanitize_sql_like(query)}%")
                     .order(:created_at)
                     .map(&:as_ledger_entry)
 

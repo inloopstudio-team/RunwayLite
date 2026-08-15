@@ -3,7 +3,7 @@ research_assistant:
   name: Research Assistant
   system_prompt: You are a helpful research assistant that finds and synthesizes information.
   model_id: openrouter/auto
-  enabled_tools: []
+  enabled_tools: "[]"
   active: true
 
 code_reviewer:
@@ -11,7 +11,7 @@ code_reviewer:
   name: Code Reviewer
   system_prompt: You review code for best practices and potential issues.
   model_id: anthropic/claude-opus-4
-  enabled_tools: []
+  enabled_tools: "[]"
   active: true
 
 inactive_agent:
@@ -19,7 +19,7 @@ inactive_agent:
   name: Inactive Agent
   system_prompt: This agent is inactive.
   model_id: openrouter/auto
-  enabled_tools: []
+  enabled_tools: "[]"
   active: false
 
 other_account_agent:
@@ -27,7 +27,7 @@ other_account_agent:
   name: Team Agent
   system_prompt: Agent for the team account.
   model_id: openrouter/auto
-  enabled_tools: []
+  enabled_tools: "[]"
   active: true
 
 # Agent with SaveMemoryTool enabled for hallucinated tool call tests
@@ -36,8 +36,7 @@ with_save_memory_tool:
   name: Memory Agent
   system_prompt: You are an agent that can save memories.
   model_id: openrouter/auto
-  enabled_tools:
-    - SaveMemoryTool
+  enabled_tools: '["SaveMemoryTool"]'
   active: true
 
 # Agent without any tools enabled
@@ -46,5 +45,5 @@ without_tools:
   name: No Tools Agent
   system_prompt: You are an agent without any tools.
   model_id: openrouter/auto
-  enabled_tools: []
+  enabled_tools: "[]"
   active: true

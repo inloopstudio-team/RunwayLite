@@ -62,6 +62,7 @@ class Account < ApplicationRecord
 
   encrypts :github_pat
 
+  store :settings, coder: JSON
   store_accessor :settings, :default_conversation_mode
 
   # Authorization scope for SyncChannel - Account is special, it IS the account

@@ -10,8 +10,5 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 1) do
-# Could not dump table "solid_cable_messages" because of following NameError
-#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
-
+ActiveRecord::Schema[8.1].define(version: 0) do
 end
