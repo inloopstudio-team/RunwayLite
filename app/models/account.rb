@@ -62,6 +62,9 @@ class Account < ApplicationRecord
   has_one :github_integration
   has_one :x_integration
 
+  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
+    serialize :settings, coder: JSON
+  end
 
   # Validations (Rails-only, no SQL constraints!)
   validates :name, presence: true

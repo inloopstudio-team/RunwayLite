@@ -1,4 +1,8 @@
 class Message < ApplicationRecord
+  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
+  serialize :moderation_scores, coder: JSON
+  serialize :replay_payload, coder: JSON
+  end
 
   serialize :tools_used, coder: JSON
 

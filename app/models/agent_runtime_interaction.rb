@@ -6,6 +6,11 @@ class AgentRuntimeInteraction < ApplicationRecord
   ACTIVE_WINDOW = 12.minutes
 
   belongs_to :agent
+  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
+  serialize :changed_identity_files, coder: JSON
+  serialize :prompt_component_bytes, coder: JSON
+  serialize :response_body, coder: JSON
+  end
   belongs_to :chat, optional: true
 
 

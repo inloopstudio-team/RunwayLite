@@ -1,4 +1,7 @@
 class ChatAgent < ApplicationRecord
+  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
+  serialize :borrowed_context_json, coder: JSON
+  end
 
 
   SUMMARY_COOLDOWN = 5.minutes

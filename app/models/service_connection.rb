@@ -1,4 +1,8 @@
 class ServiceConnection < ApplicationRecord
+  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
+  serialize :requested_scopes, coder: JSON
+  serialize :credential_metadata, coder: JSON
+  end
 
   MANAGEMENT_SCOPES = %w[personal account_managed].freeze
   STATUSES = %w[connected suspended revoked error].freeze

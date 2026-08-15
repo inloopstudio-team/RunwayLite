@@ -1,4 +1,7 @@
 class Profile < ApplicationRecord
+  if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
+  serialize :preferences, coder: JSON
+  end
 
 
   include JsonAttributes
