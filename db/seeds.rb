@@ -9,7 +9,10 @@
 #   end
 
 setting = Setting.instance
-setting.update!(site_name: 'RunwayLite') if setting.site_name.blank? || setting.site_name == 'HelixKit'
+setting.site_name = 'RunwayLite' if setting.site_name.blank? || setting.site_name == 'HelixKit'
+setting.allow_agents = true
+setting.allow_chats = true
+setting.save!
 puts "✓ Site settings initialized"
 
 # Load environment-specific seeds
