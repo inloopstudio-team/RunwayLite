@@ -3,10 +3,12 @@
   import { Toaster } from '$lib/components/shadcn/sonner/index.js';
   import { toast } from 'svelte-sonner';
   import Navbar from '$lib/components/navigation/navbar.svelte'; // Adjust the path as necessary
+  import Footer from '$lib/components/navigation/Footer.svelte';
   import { ModeWatcher, setMode, resetMode, mode } from 'mode-watcher';
 
   let { children } = $props();
   let themeInitialized = false;
+  const showFooter = $derived(!$page.component?.startsWith('chats/'));
 
   $effect(() => {
     let flash = $page.props?.flash || {};
@@ -30,15 +32,11 @@
 </script>
 
 <ModeWatcher />
-<div class="bg-bg">
+<div class="flex min-h-screen flex-col bg-bg">
   <Navbar />
-  <main>{@render children?.()}</main>
-  <footer class="border-t py-4 px-6 text-center text-xs text-muted-foreground">
-    For more advanced features, check out <a
-      href="https://inloop.studio/runway"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="underline hover:text-foreground transition-colors">inloop.studio/runway</a>
-  </footer>
+  <main class="flex-1">{@render children?.()}</main>
+  {#if showFooter}
+    <Footer />
+  {/if}
   <Toaster />
 </div>

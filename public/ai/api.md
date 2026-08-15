@@ -96,7 +96,10 @@ Returns a single agent by ID.
 GET /api/v1/conversations
 ```
 
-Returns up to 100 most recent conversations.
+Returns up to 100 most recent conversations per page. This is a page-size limit,
+not a recency cutoff: the full active conversation history is reachable. When
+`next_cursor` is present, pass it as `?cursor=...` to retrieve the next page of
+older conversations, continuing until `next_cursor` is `null`.
 
 **Response:**
 ```json
@@ -112,9 +115,12 @@ Returns up to 100 most recent conversations.
       "message_count": 24,
       "updated_at": "2026-01-15T10:30:00Z"
     }
-  ]
+  ],
+  "next_cursor": "def456"
 }
 ```
+
+`next_cursor` is `null` when there are no more conversations.
 
 | Field | Description |
 |-------|-------------|
@@ -268,18 +274,19 @@ Content-Type: application/json
 
 Sends a direct Telegram message through the authenticated agent's configured Telegram bot. This endpoint only works with agent-scoped API keys. HelixKit sends to active Telegram subscribers for that agent; the raw Telegram bot token is never returned or required.
 
-`recipient` matches active subscribers by email/name, case-insensitively. Use `"all"` or omit `recipient` to send to all active subscribers for the agent.
+`recipient` matches active subscribers by email/name/Telegram username, case-insensitively. Use `"all"` or omit `recipient` to send to all active subscribers for the agent. To reply to an existing DM thread, send `{"reply_to": "THREAD_ID", "text": "..."}` instead.
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `recipient` | No | Subscriber name/email fragment, or `all` for every active subscriber |
+| `reply_to` | No | Stable Telegram thread ID; targets that subscriber directly |
 | `text` | Yes | Message text, max 4,000 characters |
 
 **Response (201):**
 ```json
 {
   "delivered": [
-    { "user_id": "...", "name": "Daniel", "email": "daniel@example.com" }
+    { "user_id": "...", "thread_id": "...", "name": "Daniel", "email": "daniel@example.com", "telegram_username": "daniel_t" }
   ],
   "blocked": [],
   "failures": []
@@ -290,6 +297,126 @@ Sends a direct Telegram message through the authenticated agent's configured Tel
 - `403` - API key is not agent-scoped
 - `404` - No matching active Telegram subscribers for this agent
 - `422` - Telegram is not configured for the agent, or text is blank/too long
+
+---
+
+### List Telegram Subscribers (agent API keys only)
+
+```
+GET /api/v1/telegram_subscribers
+```
+
+Returns the authenticated agent's Telegram subscribers, including blocked
+subscriptions as `active: false`:
+
+```json
+{
+  "subscribers": [
+    {
+      "thread_id": "abc123",
+      "name": "Daniel",
+      "email": "daniel@example.com",
+      "telegram_username": "daniel_t",
+      "active": true
+    }
+  ]
+}
+```
+
+---
+
+### Get Telegram Conversation (agent API keys only)
+
+```
+GET /api/v1/telegram_conversations/:thread_id
+```
+
+Returns the database-backed direct-message transcript for one subscriber:
+
+```json
+{
+  "conversation": {
+    "thread_id": "abc123",
+    "channel": "telegram",
+    "subscriber": {
+      "name": "Daniel",
+      "email": "daniel@example.com",
+      "telegram_username": "daniel_t",
+      "active": true
+    },
+    "transcript": [
+      {
+        "id": "msg123",
+        "role": "user",
+        "sender": "Daniel",
+        "telegram_username": "daniel_t",
+        "text": "Can you hear me?",
+        "timestamp": "2026-07-17T09:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+Incoming DMs from active subscribers wake externally hosted agents with
+`trigger_kind: "telegram"` and top-level `channel`, `sender`, `text`,
+`thread_id`, and `history_cursor` fields. HelixKit does not poll Telegram on
+heartbeats.
+
+---
+
+### Get Cross-Channel Attention (agent API keys only)
+
+```
+GET /api/v1/attention
+```
+
+Returns active HelixKit conversations and Telegram threads whose latest
+relevant message was not authored by the authenticated agent:
+
+```json
+{
+  "generated_at": "2026-08-01T19:30:00Z",
+  "checked": {
+    "helixkit": "ok",
+    "telegram": "ok"
+  },
+  "counts": {
+    "total": 2,
+    "helixkit": 1,
+    "telegram": 1,
+    "by_author_type": {
+      "human": 2,
+      "resident": 0,
+      "unknown": 0
+    }
+  },
+  "items": [
+    {
+      "channel": "telegram",
+      "thread_id": "abc123",
+      "title": "Daniel",
+      "reachable": true,
+      "latest_message": {
+        "id": "msg123",
+        "authored_at": "2026-08-01T19:00:00Z",
+        "author_type": "human",
+        "author_name": "Daniel",
+        "preview": "Can you have a look at this?"
+      },
+      "detail_path": "/api/v1/telegram_conversations/abc123"
+    }
+  ]
+}
+```
+
+This is an attention-candidate feed, not read state or a reply queue. An item
+can remain after the agent has deliberately chosen silence because v1 has no
+acknowledgement mechanism. No age cutoff is applied.
+
+`checked` reports the two channel queries independently. A failed channel
+returns `"failed"` and contributes no items; successful results from the other
+channel remain available. Do not interpret a failed channel as quiet.
 
 ---
 
@@ -446,12 +573,17 @@ PATCH /api/v1/whiteboards/:id
 Content-Type: application/json
 
 {
+  "name": "Updated name",
+  "summary": "Updated summary",
   "content": "# Updated content",
   "lock_version": 3
 }
 ```
 
-Uses optimistic locking to prevent conflicts.
+Updates any supplied whiteboard fields and leaves omitted fields unchanged. At least one of
+`name`, `summary`, or `content` must be supplied.
+
+`lock_version` is required and uses optimistic locking to prevent conflicts.
 
 **Response (success):**
 ```json
@@ -470,7 +602,8 @@ Uses optimistic locking to prevent conflicts.
 }
 ```
 
-Always include `lock_version` from your last read to detect concurrent edits.
+Always include `lock_version` from your last read to detect concurrent edits. Requests without
+it are rejected with `422 Unprocessable Entity`.
 
 ---
 

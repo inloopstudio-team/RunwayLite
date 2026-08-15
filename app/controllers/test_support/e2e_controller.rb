@@ -19,6 +19,7 @@ module TestSupport
       account = Account.create!(name: "E2E #{run_id} Team", account_type: :team)
       account.add_user!(primary_user, role: "owner", skip_confirmation: true)
       account.add_user!(secondary_user, role: "member", skip_confirmation: true)
+      account.whiteboards.create!(name: "E2E Whiteboard", content: "# E2E Whiteboard")
 
       agents = [
         create_agent!(account, "E2E Researcher", "slate"),
@@ -31,6 +32,7 @@ module TestSupport
         run_id: run_id,
         password: PASSWORD,
         account_id: account.id,
+        empty_account_id: primary_user.personal_account.id,
         primary_user: user_json(primary_user),
         secondary_user: user_json(secondary_user),
         admin_user: user_json(admin_user),
@@ -50,8 +52,74 @@ module TestSupport
         thinking: params[:thinking],
         streaming: false
       )
+      if params[:attach_image]
+        message.attachments.attach(
+          io: Rails.root.join("test/fixtures/files/test_image.png").open,
+          filename: "agent-generated-image.png",
+          content_type: "image/png"
+        )
+      end
 
       render json: { message_id: message.to_param }
+    end
+
+    # Build a deterministic conversation without involving an LLM. This gives
+    # browser tests enough history to cross the 30-message pagination boundary
+    # while keeping the fixture cheap and repeatable.
+    def conversation_fixture
+      account = Account.find(params.fetch(:account_id))
+      count = params.fetch(:count, 65).to_i.clamp(1, 200)
+      prefix = params.fetch(:prefix, "History message").to_s.first(80)
+      user = account.users.order(:id).first!
+      agents = account.agents.active.order(:id).first(2)
+
+      chat = account.chats.new(
+        model_id: "openrouter/auto",
+        manual_responses: true,
+        title: "E2E long conversation"
+      )
+      chat.agents = agents
+      chat.save!
+
+      messages = count.times.map do |index|
+        chat.messages.create!(
+          role: "user",
+          user: user,
+          content: "#{prefix} #{index.to_s.rjust(3, "0")}"
+        )
+      end
+
+      render json: {
+        chat_id: chat.to_param,
+        message_count: messages.length,
+        first_message: messages.first.content,
+        last_message: messages.last.content
+      }
+    end
+
+    # Append a burst through the normal persistence/broadcast path. A small
+    # optional delay lets tests overlap broadcasts with Inertia reloads and
+    # ActionCable resubscriptions instead of only testing a single quiet update.
+    def append_messages
+      chat = Chat.find(params.fetch(:chat_id))
+      count = params.fetch(:count, 1).to_i.clamp(1, 50)
+      delay_ms = params.fetch(:delay_ms, 0).to_i.clamp(0, 200)
+      prefix = params.fetch(:prefix, "Live message").to_s.first(80)
+      user = chat.account.users.order(:id).first!
+
+      messages = count.times.map do |index|
+        message = chat.messages.create!(
+          role: "user",
+          user: user,
+          content: "#{prefix} #{index.to_s.rjust(3, "0")}"
+        )
+        sleep(delay_ms / 1000.0) if delay_ms.positive? && index < count - 1
+        message
+      end
+
+      render json: {
+        messages: messages.map { |message| { id: message.to_param, content: message.content } }
+      }
     end
 
     def invitation_url
@@ -92,7 +160,7 @@ module TestSupport
           account_type: account.account_type,
           disabled: account.disabled?,
           active: account.active?,
-          default_conversation_mode: account.default_conversation_mode,
+          use_system_ai_credentials: account.use_system_ai_credentials?,
           members: account.memberships.includes(:user).map { |membership|
             {
               email: membership.user.email_address,
@@ -122,7 +190,8 @@ module TestSupport
             name: agent.name,
             system_prompt: agent.system_prompt,
             paused: agent.paused?,
-            refinement_threshold: agent.refinement_threshold
+            refinement_threshold: agent.refinement_threshold,
+            heartbeat_wakes_per_day: agent.heartbeat_wakes_per_day
           }
         }
       }

@@ -30,14 +30,12 @@ async function startGroupChat(page, accountId, firstMessage) {
   await expect(page.getByRole('heading', { name: 'New Chat' })).toBeVisible();
 
   const chatForm = page.locator('main');
-  await expect(chatForm.getByRole('button', { name: /^Model$/i })).toBeVisible();
-  await expect(page.getByLabel(/allow web access/i)).toBeVisible();
-  await chatForm.getByRole('button', { name: /^Agents$/i }).click();
-  await expect(page.getByLabel(/allow web access/i)).toBeHidden();
   await expect(chatForm.getByRole('button', { name: /E2E Researcher/i })).toBeVisible();
   await expect(chatForm.getByRole('button', { name: /E2E Critic/i })).toBeVisible();
   await expect(chatForm.getByRole('button', { name: /E2E Paused Fork/i })).toBeVisible();
   await expect(chatForm.getByRole('button', { name: /E2E Inactive Fork/i })).toBeHidden();
+  await expect(chatForm.getByRole('button', { name: /^Model$/i })).toBeHidden();
+  await expect(page.getByLabel(/allow web access/i)).toBeHidden();
 
   const composer = page.locator('main textarea').last();
   await composer.fill(firstMessage);
@@ -96,6 +94,30 @@ test.describe('browser contracts', () => {
     await expect(page.getByText(/I will compare both deterministic test agents/)).toBeVisible();
   });
 
+  test('agent image attachments render as thumbnails and open the lightbox', async ({ page, request }) => {
+    await login(page, setup.primary_user, setup.password);
+    const chatId = await startGroupChat(page, setup.account_id, 'Please make a small test image.');
+
+    const response = await request.post('/test/e2e/assistant_message', {
+      data: {
+        chat_id: chatId,
+        content: 'Here is the generated image.',
+        attach_image: true,
+      },
+    });
+    expect(response.ok()).toBe(true);
+
+    await page.reload();
+    await expect(page.getByText('Here is the generated image.')).toBeVisible();
+    const thumbnail = page.getByRole('img', { name: 'agent-generated-image.png' }).first();
+    await expect(thumbnail).toBeVisible();
+    await thumbnail.click();
+
+    await expect(page.getByText('View full size original')).toBeVisible();
+    await expect(page.getByTitle('Download original')).toHaveAttribute('href', /rails\/active_storage/);
+    await expect(page.getByRole('img', { name: 'agent-generated-image.png' }).last()).toBeVisible();
+  });
+
   test('hosted agent promotion page explains local sandbox testing', async ({ page }) => {
     await login(page, setup.primary_user, setup.password);
     const agentId = setup.agents[0].id;
@@ -107,6 +129,37 @@ test.describe('browser contracts', () => {
     await expect(page.getByText(/without a GitHub repo, master key, DNS, or SSH deploy step/)).toBeVisible();
     await expect(page.getByText(/published to/)).toBeVisible();
     await expect(page.getByText(/127.0.0.1/)).toBeVisible();
+  });
+
+  test('agent navigation is direct and whiteboards only appear for configured accounts', async ({ page }) => {
+    await login(page, setup.primary_user, setup.password);
+
+    await page.goto(`/accounts/${setup.empty_account_id}/chats`);
+    const accountMenu = page.getByRole('button', { name: 'User account menu' });
+    await accountMenu.click();
+    await expect(page.getByRole('menuitem', { name: 'Whiteboards' })).toBeHidden();
+    await page.keyboard.press('Escape');
+
+    await accountMenu.click();
+    await page.locator('[data-dropdown-menu-sub-trigger]').filter({ hasText: 'Account' }).hover();
+    await page.getByRole('menuitem', { name: `E2E ${setup.run_id} Team`, exact: true }).click();
+    await expect(page).toHaveURL(/\/accounts\/[^/]+\/chats$/);
+    const switchedAccountId = new URL(page.url()).pathname.split('/')[2];
+
+    await expect(page.locator('nav').getByRole('link', { name: 'Documentation', exact: true })).toBeHidden();
+    await expect(page.locator('nav').getByRole('link', { name: 'About', exact: true })).toBeHidden();
+    const agentsLink = page.locator('nav').getByRole('link', { name: 'Agents', exact: true });
+    await expect(agentsLink).toHaveAttribute('href', new RegExp(`/accounts/${switchedAccountId}/agents$`));
+    await agentsLink.click();
+    await expect(page).toHaveURL(`/accounts/${switchedAccountId}/agents`);
+    await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible();
+
+    await accountMenu.click();
+    const whiteboardsItem = page.getByRole('menuitem', { name: 'Whiteboards' });
+    await expect(whiteboardsItem).toBeVisible();
+    await whiteboardsItem.click();
+    await expect(page).toHaveURL(/\/accounts\/[^/]+\/whiteboards$/);
+    await expect(page.getByRole('heading', { name: 'Whiteboards' })).toBeVisible();
   });
 
   test('user can promote a hosted agent into a local Docker sandbox', async ({ page, request }) => {
@@ -132,14 +185,6 @@ test.describe('browser contracts', () => {
     await expect(page.getByText(/Container exists:\s*yes/)).toBeVisible();
   });
 
-  test('documentation page renders code examples', async ({ page }) => {
-    await page.goto('/documentation');
-
-    await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Real-time Synchronization System/ })).toBeVisible();
-    await expect(page.locator('code').filter({ hasText: 'include SyncAuthorizable' })).toBeVisible();
-  });
-
   test('chat messages sync between two logged-in browser windows', async ({ browser, page }) => {
     await login(page, setup.primary_user, setup.password);
     await startGroupChat(page, setup.account_id, 'Initial message from the primary user.');
@@ -158,25 +203,15 @@ test.describe('browser contracts', () => {
     await secondContext.close();
   });
 
-  test('account default can open new conversations in agents mode', async ({ page, request }) => {
+  test('new conversations remain agent-only without an account conversation-mode setting', async ({ page }) => {
     await login(page, setup.primary_user, setup.password);
     await page.goto(`/accounts/${setup.account_id}/edit`);
     await expect(page.getByRole('heading', { name: 'Edit Account' })).toBeVisible();
-
-    await page.locator('#default-conversation-agents').click();
-    await page.getByRole('button', { name: 'Save Changes' }).click();
-    await expect(page).toHaveURL(/\/accounts\/[^/]+$/);
-
-    const stateResponse = await request.post('/test/e2e/state', {
-      data: { run_id: setup.run_id, account_id: setup.account_id },
-    });
-    expect(stateResponse.ok()).toBe(true);
-    const state = await stateResponse.json();
-    expect(state.account.default_conversation_mode).toBe('agents');
+    await expect(page.getByText('New Conversation Default')).toBeHidden();
 
     await page.goto(`/accounts/${setup.account_id}/chats`);
     const chatForm = page.locator('main');
-    await expect(chatForm.getByRole('button', { name: /^Agents$/i })).toHaveClass(/bg-primary/);
+    await expect(chatForm.getByRole('button', { name: /^Model$/i })).toBeHidden();
     await expect(page.getByLabel(/allow web access/i)).toBeHidden();
     await expect(chatForm.getByRole('button', { name: /E2E Researcher/i })).toBeVisible();
     await expect(chatForm.getByRole('button', { name: /E2E Critic/i })).toBeVisible();
@@ -259,21 +294,23 @@ test.describe('browser contracts', () => {
     await page.goto(setup.agents[0].edit_url);
     await expect(page.getByRole('heading', { name: 'Edit Agent' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Memory' }).click();
-    await expect(page.getByRole('heading', { name: 'Agent Memory' })).toBeVisible();
-    await page.getByRole('button', { name: 'Add Memory' }).click();
-    await expect(page.getByLabel('Memory Content')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save Memory' })).toBeDisabled();
-    await page
-      .getByRole('button', { name: 'Save Memory' })
-      .locator('..')
-      .getByRole('button', { name: 'Cancel' })
-      .click();
-    await page.getByRole('button', { name: 'Identity' }).click();
+    await page.getByLabel('Display name').fill('E2E Refactor Sentinel');
+    await page.getByRole('button', { name: 'Integrations' }).click();
+    await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Telegram' })).toBeVisible();
+    await page.getByRole('button', { name: 'Set up' }).click();
+    await expect(page.getByRole('heading', { name: 'Create a Telegram bot' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '@BotFather in Telegram' })).toHaveAttribute(
+      'href',
+      'https://t.me/botfather'
+    );
+    await expect(page.getByText('/newbot')).toBeVisible();
+    await page.getByRole('button', { name: 'All integrations' }).click();
+    await expect(page.getByRole('button', { name: 'Set up' })).toBeVisible();
 
-    await page.getByLabel('Name').fill('E2E Refactor Sentinel');
-    await page.getByLabel('System Prompt').fill('You are an E2E sentinel guarding refactors.');
-    await page.getByLabel('Refinement Retention Threshold').fill('0.85');
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await page.getByLabel('Heartbeat wakes per day').fill('4');
     await page.locator('label[for="paused"]').click();
     await page.getByRole('button', { name: 'Update Agent' }).click();
 
@@ -284,11 +321,30 @@ test.describe('browser contracts', () => {
     expect(state.agents).toContainEqual(
       expect.objectContaining({
         name: 'E2E Refactor Sentinel',
-        system_prompt: 'You are an E2E sentinel guarding refactors.',
         paused: true,
-        refinement_threshold: 0.85,
+        heartbeat_wakes_per_day: 4,
       })
     );
+  });
+
+  test('account AI API keys can be configured without exposing saved values', async ({ page }) => {
+    await login(page, setup.primary_user, setup.password);
+    await page.goto(`/accounts/${setup.account_id}/edit`);
+
+    const openRouterKey = page.getByLabel('OpenRouter');
+    await expect(openRouterKey).toHaveAttribute('type', 'password');
+    await openRouterKey.fill('e2e-openrouter-secret');
+    await expect(page.getByText('Shared AI keys are available as a fallback')).toBeHidden();
+
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(page).toHaveURL(/\/accounts\/[^/]+$/);
+
+    await page.goto(`/accounts/${setup.account_id}/edit`);
+    await expect(page.getByText('Set', { exact: true })).toBeVisible();
+    await expect(page.getByText('Not set', { exact: true })).toHaveCount(5);
+    await expect(page.getByLabel('OpenRouter')).toHaveValue('');
+    await expect(page.getByLabel('OpenRouter')).toHaveAttribute('placeholder', 'Enter a replacement key');
+    await expect(page.locator('body')).not.toContainText('e2e-openrouter-secret');
   });
 });
 
@@ -313,6 +369,11 @@ test.describe('admin account management', () => {
     await page.goto(`/admin/accounts?account_id=${setup.account_id}`);
     const details = page.locator('main');
     await expect(details.getByRole('heading', { name: `E2E ${setup.run_id} Team` })).toBeVisible();
+
+    const sharedAiCredentials = details.getByRole('switch', { name: 'Use shared keys as fallback' });
+    await expect(sharedAiCredentials).toHaveAttribute('aria-checked', 'false');
+    await sharedAiCredentials.click();
+    await expect(sharedAiCredentials).toHaveAttribute('aria-checked', 'true');
 
     const secondaryRow = details.getByRole('row').filter({ hasText: setup.secondary_user.email });
     await expect(secondaryRow).toBeVisible();
@@ -348,5 +409,6 @@ test.describe('admin account management', () => {
     expect(state.account.account_type).toBe('team');
     expect(state.account.disabled).toBe(true);
     expect(state.account.active).toBe(false);
+    expect(state.account.use_system_ai_credentials).toBe(true);
   });
 });

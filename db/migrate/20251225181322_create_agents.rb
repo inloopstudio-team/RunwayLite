@@ -6,7 +6,7 @@ class CreateAgents < ActiveRecord::Migration[8.1]
       t.string :name, null: false
       t.text :system_prompt
       t.string :model_id, null: false, default: "openrouter/auto"
-      t.jsonb :enabled_tools, null: false, default: []
+      t.text :enabled_tools, null: false, default: '[]'
       t.boolean :active, null: false, default: true
 
       t.timestamps

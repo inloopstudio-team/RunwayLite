@@ -1,5 +1,9 @@
 class Message < ApplicationRecord
 
+  serialize :tools_used, coder: JSON
+  serialize :moderation_scores, coder: JSON
+  serialize :replay_payload, coder: JSON
+
   include Broadcastable
   include ObfuscatesId
   include JsonAttributes
@@ -10,6 +14,8 @@ class Message < ApplicationRecord
   include Message::Replayable
   include Message::Streamable
 
+  acts_as_message model: :ai_model, model_class: "AiModel", model_foreign_key: :ai_model_id
+
   belongs_to :ai_model, class_name: "AiModel", optional: true
   has_many :tool_calls, dependent: :destroy
 
@@ -17,6 +23,14 @@ class Message < ApplicationRecord
   # We override to maintain backwards compatibility with our string-based API.
   # Virtual attribute enables mass assignment (e.g., create!(thinking: "..."))
   attribute :thinking, :string
+
+  # RubyLLM does not classify Word documents as a supported attachment type.
+  # Convert them to inline text while preserving any other supported files.
+  def to_llm
+    super.tap do |llm_message|
+      llm_message.content = content_with_documents_for_llm if word_documents_attached?
+    end
+  end
 
   def thinking
     thinking_text
@@ -48,7 +62,7 @@ class Message < ApplicationRecord
 
     joins(:chat)
       .where(chats: { account_id: account.id, discarded_at: nil })
-      .where("messages.content ILIKE ?", "%#{sanitize_sql_like(query)}%")
+      .where("LOWER(messages.content) LIKE LOWER(?)", "%#{sanitize_sql_like(query)}%")
       .where(role: %w[user assistant])
       .includes(:chat, :user, :agent)
       .order(created_at: :desc)
@@ -67,12 +81,18 @@ class Message < ApplicationRecord
                   :fixable,
                   :audio_source, :audio_url,
                   :voice_available, :voice_audio_url,
-                  :reasoning_skip_reason, :reasoning_skip_reason_label
+                  :reasoning_skip_reason, :reasoning_skip_reason_label do |hash, options|
+    if options&.dig(:include_ruby_llm_telemetry) && (telemetry = ruby_llm_telemetry)
+      hash["ruby_llm_telemetry"] = telemetry
+    end
+
+    hash
+  end
 
   def completed?
     # User messages are always completed
-    # Assistant messages are completed if they have content
-    role == "user" || (role == "assistant" && content.present?)
+    # Assistant messages are completed if they have content or attachments
+    role == "user" || (role == "assistant" && (content.present? || attachments.attached?))
   end
 
   alias_method :completed, :completed?
@@ -132,6 +152,34 @@ class Message < ApplicationRecord
 
   def voice_available
     role == "assistant" && agent&.voiced?
+  end
+
+  def ruby_llm_telemetry
+    return unless role == "assistant"
+    return if agent&.externally_hosted?
+
+    token_usage = {
+      input_tokens: input_tokens,
+      output_tokens: output_tokens,
+      cache_read_tokens: cached_tokens,
+      cache_write_tokens: cache_creation_tokens
+    }
+
+    telemetry = {
+      model: model_id_string.presence || chat.model_id,
+      instrumentation_complete: token_usage.values.none?(&:nil?),
+      **token_usage
+    }
+
+    layout = {
+      prompt_layout_version: prompt_layout_version,
+      stable_prompt_bytes: stable_prompt_bytes,
+      transcript_prompt_bytes: transcript_prompt_bytes,
+      envelope_prompt_bytes: envelope_prompt_bytes,
+      stable_prompt_sha256: stable_prompt_sha256
+    }
+    telemetry.merge!(layout) if layout.values.any?(&:present?)
+    telemetry
   end
 
   def content_for_speech

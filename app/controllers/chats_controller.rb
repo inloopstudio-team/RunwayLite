@@ -2,13 +2,13 @@ class ChatsController < ApplicationController
 
   require_feature_enabled :chats
   before_action :set_chat, except: [ :index, :create, :new, :search ]
+  before_action :require_available_agents, only: [ :index, :new ]
 
   def index
     @chats = sidebar_chats
 
     render inertia: "chats/new", props: {
       chats: Chat.cached_json_for(Array(@chats), as: :sidebar_json),
-      models: available_models,
       agents: available_agents(as: :list),
       account: current_account.as_json,
       file_upload_config: file_upload_config
@@ -21,7 +21,6 @@ class ChatsController < ApplicationController
     render inertia: "chats/new", props: {
       chats: Chat.cached_json_for(@chats, as: :sidebar_json),
       account: current_account.as_json,
-      models: available_models,
       agents: available_agents(as: :list),
       file_upload_config: file_upload_config
     }
@@ -38,12 +37,14 @@ class ChatsController < ApplicationController
     if inertia_prop_requested?(:messages)
       messages = @chat.messages_page
       has_more = messages.any? && @chat.messages.where("id < ?", messages.first.id).exists?
-      props[:messages] = messages.collect(&:as_json)
+      interaction_costs = InteractionCostsByMessage.new(chat: @chat, messages: messages).call
+      props[:messages] = messages.map { |message| message_json(message, interaction_costs[message.id]) }
       props[:has_more_messages] = has_more
       props[:oldest_message_id] = messages.first&.to_param
     end
 
     props[:runtime_interactions] = runtime_interactions_for_timeline if inertia_prop_requested?(:runtime_interactions)
+    props[:cost_breakdown] = ChatUsageReport.new(chat: @chat).call if inertia_prop_requested?(:cost_breakdown)
 
     props[:chat] = chat_json_with_whiteboard if inertia_prop_requested?(:chat)
     props[:models] = available_models if inertia_prop_requested?(:models)
@@ -57,21 +58,28 @@ class ChatsController < ApplicationController
   end
 
   def create
-    chat_attrs = chat_params
-    chat_attrs[:manual_responses] = true if params[:agent_ids].present?
+    unless available_agents_scope.exists?
+      redirect_to agent_creation_path, alert: "Create an agent before starting a conversation"
+      return
+    end
 
-    # Decode obfuscated agent IDs
-    decoded_agent_ids = params[:agent_ids].present? ? Agent.decode_id(params[:agent_ids]) : nil
+    agents = selected_agents
+    if agents.empty?
+      redirect_to new_account_chat_path(current_account), alert: "Select at least one agent"
+      return
+    end
 
     @chat = current_account.chats.create_with_message!(
-      chat_attrs,
+      chat_create_params.merge(manual_responses: true),
       message_content: params[:message],
       user: Current.user,
       files: params[:files],
-      agent_ids: decoded_agent_ids
+      agent_ids: agents.map(&:id)
     )
-    audit("create_chat", @chat, **chat_params.to_h)
+    audit("create_chat", @chat, **chat_create_params.to_h)
     redirect_to account_chat_path(current_account, @chat)
+  rescue ActiveRecord::RecordNotFound
+    redirect_to new_account_chat_path(current_account), alert: "Select valid agents from this account"
   end
 
   def update
@@ -137,6 +145,10 @@ class ChatsController < ApplicationController
       .permit(:model_id, :web_access, :manual_responses, :title)
   end
 
+  def chat_create_params
+    params.fetch(:chat, {}).permit(:title)
+  end
+
   def available_models
     @available_models ||= Chat::MODELS
   end
@@ -150,7 +162,7 @@ class ChatsController < ApplicationController
   end
 
   def available_agents(as: nil)
-    scope = current_account.agents.active.order(:paused, :name)
+    scope = available_agents_scope
 
     if as.present?
       scope.as_json(as: as)
@@ -159,9 +171,30 @@ class ChatsController < ApplicationController
     end
   end
 
+  def available_agents_scope
+    current_account.agents.active.where.not(runtime: %w[provisioning migrating]).order(:paused, :name)
+  end
+
+  def selected_agents
+    ids = Array(params[:agent_ids]).reject(&:blank?)
+    return [] if ids.empty?
+
+    current_account.agents.active.where.not(runtime: %w[provisioning migrating]).find(Agent.decode_id(ids))
+  end
+
+  def require_available_agents
+    return if available_agents_scope.exists?
+
+    redirect_to agent_creation_path, alert: "Create an agent before starting a conversation"
+  end
+
+  def agent_creation_path
+    account_agents_path(current_account, create: true)
+  end
+
   def addable_agents_for_chat(as: nil)
     return [] unless @chat.group_chat?
-    scope = current_account.agents.active.where.not(id: @chat.agent_ids)
+    scope = current_account.agents.active.where.not(runtime: %w[provisioning migrating], id: @chat.agent_ids)
     as.present? ? scope.as_json(as: as) : scope.as_json
   end
 
@@ -173,6 +206,12 @@ class ChatsController < ApplicationController
       .select(&:visible_in_chat_timeline?)
       .sort_by { |interaction| interaction.finished_at || interaction.started_at || interaction.created_at }
       .map(&:as_chat_activity_json)
+  end
+
+  def message_json(message, interaction_cost = nil)
+    message.as_json(include_ruby_llm_telemetry: Current.user&.site_admin).tap do |json|
+      json["interaction_cost"] = interaction_cost if interaction_cost
+    end
   end
 
   def chat_json_with_whiteboard

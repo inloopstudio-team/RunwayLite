@@ -28,7 +28,9 @@ class AccountsController < ApplicationController
     if params[:convert].present?
       render inertia: "accounts/convert_confirmation", props: edit_conversion_props
     else
-      render inertia: "accounts/edit", props: { account: @account }
+      render inertia: "accounts/edit", props: {
+        account: @account
+      }
     end
   end
 
@@ -110,11 +112,11 @@ class AccountsController < ApplicationController
   end
 
   def account_params
-    params.require(:account).permit(:name, :default_conversation_mode)
+    params.require(:account).permit(:name)
   end
 
   def create_account_params
-    params.require(:account).permit(:name, :account_type, :default_conversation_mode)
+    params.require(:account).permit(:name, :account_type)
   end
 
   def current_account

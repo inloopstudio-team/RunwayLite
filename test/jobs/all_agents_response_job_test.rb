@@ -35,8 +35,28 @@ class AllAgentsResponseJobTest < ActiveJob::TestCase
     recorded_at = Time.zone.parse("2026-05-03 11:52 UTC")
     @user_message.update!(created_at: recorded_at)
 
+    stub_request(:post, "https://api.openai.com/v1/chat/completions")
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: {
+          id: "chatcmpl-all-agents-test",
+          object: "chat.completion",
+          created: recorded_at.to_i,
+          model: "gpt-5-nano",
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant", content: "First agent response." },
+              finish_reason: "stop"
+            }
+          ],
+          usage: { prompt_tokens: 24, completion_tokens: 5, total_tokens: 29 }
+        }.to_json
+      )
+
     travel_to recorded_at do
-      VCR.use_cassette("jobs/all_agents_response_job/processes_first_agent") do
+      VCR.turned_off do
         assert_enqueued_with(job: AllAgentsResponseJob, args: [ @chat, [ @agent2.id ] ]) do
           AllAgentsResponseJob.perform_now(@chat, agent_ids)
         end
@@ -60,9 +80,12 @@ class AllAgentsResponseJobTest < ActiveJob::TestCase
   test "builds context messages for the selected agent" do
     context = @chat.build_context_for_agent(@agent1, thinking_enabled: false, provider: :openrouter)
 
-    assert_equal 2, context.length, "Should include system prompt and user message"
+    assert_equal 3, context.length, "Should include stable system prompt, context envelope, and user message"
     assert_equal "system", context.first[:role]
     assert_equal "user", context.second[:role]
+    assert_includes context.second[:content], "<helixkit_context>"
+    assert_equal "user", context.third[:role]
+    assert_includes context.third[:content], "Hello, agents!"
   end
 
   test "sequential processing creates context for subsequent agents" do
@@ -74,13 +97,16 @@ class AllAgentsResponseJobTest < ActiveJob::TestCase
 
     second_agent_context = @chat.build_context_for_agent(@agent2, thinking_enabled: false, provider: :openrouter)
 
-    # Second agent should see system + user message + first agent's response
-    assert_equal 3, second_agent_context.length, "Second agent should see all prior messages"
+    # Second agent should see system + envelope + user message + first agent's response
+    assert_equal 4, second_agent_context.length, "Second agent should see all prior messages"
     assert_equal "system", second_agent_context[0][:role]
     assert_equal "user", second_agent_context[1][:role]
-    # The third message is from agent1, formatted as a user message with [AgentName] prefix
+    assert_includes second_agent_context[1][:content], "<helixkit_context>"
     assert_equal "user", second_agent_context[2][:role]
-    assert_includes second_agent_context[2][:content], "Research Assistant"
+    assert_includes second_agent_context[2][:content], "Hello, agents!"
+    # The final message is from agent1, formatted as a user message with [AgentName] prefix
+    assert_equal "user", second_agent_context[3][:role]
+    assert_includes second_agent_context[3][:content], "Research Assistant"
   end
 
   test "queues remaining agents when an anthropic thinking agent is skipped for missing API key" do
@@ -109,6 +135,54 @@ class AllAgentsResponseJobTest < ActiveJob::TestCase
     skipped_message = @chat.messages.where(role: "assistant", agent: anthropic_agent).last
     assert_not_nil skipped_message
     assert_equal "anthropic_key_unavailable", skipped_message.reasoning_skip_reason
+  end
+
+  test "gpt 5.6 sol disables default reasoning when tools are present" do
+    @agent1.update!(
+      model_id: "openai/gpt-5.6-sol",
+      thinking_enabled: false,
+      enabled_tools: [ "CloseConversationTool" ]
+    )
+
+    request = stub_request(:post, "https://api.openai.com/v1/chat/completions")
+      .with do |req|
+        body = JSON.parse(req.body)
+        body["model"] == "gpt-5.6-sol" &&
+          body["reasoning_effort"] == "none" &&
+          body["tools"].present?
+      end
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: {
+          id: "chatcmpl-sol-default-reasoning-test",
+          object: "chat.completion",
+          created: 1_784_220_000,
+          model: "gpt-5.6-sol",
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant", content: "Sol group response" },
+              finish_reason: "stop"
+            }
+          ],
+          usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 }
+        }.to_json
+      )
+
+    VCR.turned_off do
+      AllAgentsResponseJob.perform_now(@chat, [ @agent1.id ])
+    end
+
+    assert_requested request
+    response = @chat.messages.where(role: "assistant", agent: @agent1).last
+    assert_equal "Sol group response", response.content
+    assert_nil response.reasoning_skip_reason
+    assert_equal 2, response.prompt_layout_version
+    assert_operator response.stable_prompt_bytes, :>, 0
+    assert_operator response.transcript_prompt_bytes, :>, 0
+    assert_operator response.envelope_prompt_bytes, :>, 0
+    assert_match(/\A[0-9a-f]{64}\z/, response.stable_prompt_sha256)
   end
 
   test "external first agent receives trigger and remaining agents are queued" do

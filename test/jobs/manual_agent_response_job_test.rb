@@ -33,8 +33,28 @@ class ManualAgentResponseJobTest < ActiveJob::TestCase
     recorded_at = Time.zone.parse("2026-05-03 11:51 UTC")
     @user_message.update!(created_at: recorded_at)
 
+    stub_request(:post, "https://api.openai.com/v1/chat/completions")
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: {
+          id: "chatcmpl-manual-agent-test",
+          object: "chat.completion",
+          created: recorded_at.to_i,
+          model: "gpt-5-nano",
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant", content: "A concise research response." },
+              finish_reason: "stop"
+            }
+          ],
+          usage: { prompt_tokens: 20, completion_tokens: 6, total_tokens: 26 }
+        }.to_json
+      )
+
     travel_to recorded_at do
-      VCR.use_cassette("jobs/manual_agent_response_job/creates_agent_message") do
+      VCR.turned_off do
         ManualAgentResponseJob.perform_now(@chat, @agent)
       end
     end
@@ -49,10 +69,61 @@ class ManualAgentResponseJobTest < ActiveJob::TestCase
   test "builds context for agent response" do
     context = @chat.build_context_for_agent(@agent, thinking_enabled: false, provider: :openrouter)
 
-    assert_equal 2, context.length, "Should include system prompt and user message"
+    assert_equal 3, context.length, "Should include stable system prompt, context envelope, and user message"
     assert_equal "system", context.first[:role]
     assert_equal "user", context.second[:role]
-    assert_includes context.second[:content], "Hello, agents!"
+    assert_includes context.second[:content], "<helixkit_context>"
+    assert_equal "user", context.third[:role]
+    assert_includes context.third[:content], "Hello, agents!"
+  end
+
+  test "gpt 5.6 sol keeps tools by disabling reasoning effort on chat completions" do
+    @agent.update!(
+      model_id: "openai/gpt-5.6-sol",
+      thinking_enabled: true,
+      thinking_budget: 5000,
+      enabled_tools: [ "CloseConversationTool" ]
+    )
+
+    request = stub_request(:post, "https://api.openai.com/v1/chat/completions")
+      .with do |req|
+        body = JSON.parse(req.body)
+        body["model"] == "gpt-5.6-sol" &&
+          body["reasoning_effort"] == "none" &&
+          body["tools"].present?
+      end
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: {
+          id: "chatcmpl-sol-tool-test",
+          object: "chat.completion",
+          created: 1_784_220_000,
+          model: "gpt-5.6-sol",
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant", content: "Sol tool response" },
+              finish_reason: "stop"
+            }
+          ],
+          usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 }
+        }.to_json
+      )
+
+    VCR.turned_off do
+      ManualAgentResponseJob.perform_now(@chat, @agent)
+    end
+
+    assert_requested request
+    response = @chat.messages.where(role: "assistant", agent: @agent).last
+    assert_equal "Sol tool response", response.content
+    assert_equal "provider_unsupported", response.reasoning_skip_reason
+    assert_equal 2, response.prompt_layout_version
+    assert_operator response.stable_prompt_bytes, :>, 0
+    assert_operator response.transcript_prompt_bytes, :>, 0
+    assert_operator response.envelope_prompt_bytes, :>, 0
+    assert_match(/\A[0-9a-f]{64}\z/, response.stable_prompt_sha256)
   end
 
   test "external agent receives trigger request instead of local llm response" do

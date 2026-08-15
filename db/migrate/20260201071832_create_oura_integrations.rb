@@ -10,7 +10,7 @@ class CreateOuraIntegrations < ActiveRecord::Migration[8.1]
       t.datetime :token_expires_at
 
       # Cached health data (refreshed periodically)
-      t.jsonb :health_data, default: {}
+      t.text :health_data, default: '{}'
       t.datetime :health_data_synced_at
 
       # User preference - single toggle

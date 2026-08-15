@@ -8,9 +8,21 @@ set -e
 AGENT_HOME=/home/agent
 AGENT_REPO_PATH="${AGENT_REPO_PATH:-$AGENT_HOME/repo}"
 
+# External-service credentials are runtime-supplied hosting context. The source
+# is copied into the container before first boot; copy it into tmpfs for the
+# resident and never into identity, repository, work, state, or Chaos volumes.
+if [ -f /run/helixkit-source.yml ]; then
+    mkdir -p /run/helixkit
+    cp /run/helixkit-source.yml /run/helixkit/services.yml
+    chown 1000:1000 /run/helixkit
+    chmod 0700 /run/helixkit
+    chown 1000:1000 /run/helixkit/services.yml
+    chmod 0600 /run/helixkit/services.yml
+fi
+
 # Docker-managed volumes are root-owned when first created. The agent user needs
 # write access to both canonical identity/memory and chaos session state.
-for path in "$AGENT_HOME/identity" "$AGENT_HOME/.chaos" "$AGENT_REPO_PATH"; do
+for path in "$AGENT_HOME/identity" "$AGENT_HOME/.chaos" "$AGENT_REPO_PATH" "$AGENT_HOME/work" "$AGENT_HOME/state"; do
     if [ -d "$path" ]; then
         chown -R 1000:1000 "$path" || true
     fi
@@ -25,7 +37,39 @@ mkdir -p "$AGENT_HOME/identity/automation" \
          "$AGENT_HOME/identity/memory/daily-journals" \
          "$AGENT_HOME/identity/memory/automation/state" \
          "$AGENT_HOME/.chaos" \
-         "$AGENT_REPO_PATH/.chaos"
+         "$AGENT_REPO_PATH/.chaos" \
+         "$AGENT_HOME/work" \
+         "$AGENT_HOME/state/claude" \
+         "$AGENT_HOME/state/antigravity"
+chmod 0700 "$AGENT_HOME/state" "$AGENT_HOME/state/claude" "$AGENT_HOME/state/antigravity"
+
+# Chaos bundles Anthropic, OpenAI, and xAI providers. Hosted agents also need
+# the two providers RubyLLM may select that are not bundled by Chaos itself.
+# Append only missing sections so persisted/user-managed settings win.
+CHAOS_CONFIG="$AGENT_HOME/.chaos/config.toml"
+touch "$CHAOS_CONFIG"
+if ! grep -q '^\[model_providers\.gemini\]' "$CHAOS_CONFIG"; then
+    cat >> "$CHAOS_CONFIG" <<'GEMINI_PROVIDER'
+
+[model_providers.gemini]
+name = "Gemini"
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+env_key = "GEMINI_API_KEY"
+wire_api = "chat_completions"
+GEMINI_PROVIDER
+fi
+if ! grep -q '^\[model_providers\.openrouter\]' "$CHAOS_CONFIG"; then
+    cat >> "$CHAOS_CONFIG" <<'OPENROUTER_PROVIDER'
+
+[model_providers.openrouter]
+name = "OpenRouter"
+base_url = "https://openrouter.ai/api/v1"
+env_key = "OPENROUTER_API_KEY"
+wire_api = "chat_completions"
+OPENROUTER_PROVIDER
+fi
+chown 1000:1000 "$CHAOS_CONFIG" || true
+
 # Platform-managed helper: refresh on every boot so runtime improvements reach
 # existing hosted agents. The journal files it invites are agent-owned; the hook
 # script itself is runtime infrastructure.
@@ -82,87 +126,6 @@ Chaos may read both global (`~/.chaos`) and project (`-C .../.chaos`) hooks, so
 HelixKit does not install a second copy here. Keeping only one active hook avoids
 duplicate journal-reflex invitations after a turn.
 HOOKS_NOTE
-RUNTIME_INSTRUCTIONS="$AGENT_HOME/identity/runtime-instructions.md"
-RUNTIME_INSTRUCTIONS_NEW="$AGENT_HOME/identity/runtime-instructions.md.new"
-write_runtime_instructions() {
-    target="$1"
-    cat > "$target" <<'RUNTIME'
-<!-- helixkit-managed-runtime-instructions:v3 -->
-
-# Hosted runtime instructions
-
-You are running as a hosted HelixKit agent inside an external Chaos runtime.
-These instructions describe the runtime context around your identity; they do
-not replace `soul.md`.
-
-## Identity and prompt order
-
-On each trigger, the runtime places `soul.md` first in your prompt context.
-Treat `soul.md` as your defining text. After that, use this file,
-`self-narrative.md`, `bootstrap.md`, and the memory files for operational
-context.
-
-## HelixKit access
-
-Use `helixkit-api.md` for the REST API manual. Conversation transcripts remain
-in HelixKit; read them through the API when you're considering a conversation,
-e.g. after a trigger arrives. `HELIXKIT_APP_URL` and `HELIXKIT_BEARER_TOKEN`
-are present in your shell environment.
-
-## Telegram direct messages
-
-If your HelixKit agent has Telegram configured, you can send direct Telegram
-messages to active subscribers of your bot without handling the raw bot token.
-Prefer the helper:
-
-```sh
-helixkit-send-telegram daniel "Short message"
-printf 'Longer message\nwith lines\n' | helixkit-send-telegram paulina
-helixkit-send-telegram all "Message to all active Telegram subscribers"
-```
-
-Recipients are matched by email/name among people who have subscribed to your
-Telegram bot in HelixKit. Use this thoughtfully; Telegram is a direct human
-notification channel, not a place to mirror routine HelixKit chatter.
-
-## Legacy memories
-
-HelixKit memory records exported at promotion live under `memory/` as dated
-Markdown files named like `YYYY-MM-DD-journal-123.md` or
-`YYYY-MM-DD-core-123.md`. `self-narrative.md` may also include a short memory
-outline. Treat those files as legacy memory source material; preserve them
-unless Daniel explicitly asks you to edit or consolidate them.
-
-## Diarized memory
-
-A Chaos Stop hook may invite you after each turn to append a daily journal entry
-under `memory/daily-journals/`, or to answer `no shape` when nothing should be
-kept. These journals are raw diarized memory and future summary source
-material. When writing a journal, preserve existing entries and append a new
-`## HH:MM — ...` section; never overwrite or truncate an existing daily journal
-file. You can use `helixkit-append-journal "Title"` and pipe the entry body into
-it to append safely.
-
-## Repository stewardship
-
-If you improve your own repository or identity files, prefer small, reviewable
-commits. Commit with a clear message explaining what you changed and why so
-Daniel can review the GitHub history.
-RUNTIME
-}
-if [ ! -f "$RUNTIME_INSTRUCTIONS" ]; then
-    write_runtime_instructions "$RUNTIME_INSTRUCTIONS"
-elif grep -q "helixkit-managed-runtime-instructions:" "$RUNTIME_INSTRUCTIONS"; then
-    write_runtime_instructions "$RUNTIME_INSTRUCTIONS"
-elif grep -q "^# Hosted runtime instructions$" "$RUNTIME_INSTRUCTIONS" && grep -q "hosted HelixKit agent inside an external Chaos runtime" "$RUNTIME_INSTRUCTIONS"; then
-    # Older generated runtime-instructions had no version marker. Treat the
-    # known generated shape as platform-managed and refresh it.
-    write_runtime_instructions "$RUNTIME_INSTRUCTIONS"
-else
-    # The agent appears to have edited/replaced this file. Preserve it and leave
-    # the updated platform copy nearby for manual review.
-    write_runtime_instructions "$RUNTIME_INSTRUCTIONS_NEW"
-fi
 if [ ! -f "$AGENT_HOME/identity/memory/daily-journals/README.md" ]; then
     cat > "$AGENT_HOME/identity/memory/daily-journals/README.md" <<'README'
 # Daily journals
@@ -186,7 +149,7 @@ overwrite or truncate existing entries; with shell redirection, use >> rather
 than > for an existing journal.
 README
 fi
-chown -R 1000:1000 "$AGENT_REPO_PATH" "$AGENT_HOME/identity/automation" "$AGENT_HOME/identity/memory" "$RUNTIME_INSTRUCTIONS" "$RUNTIME_INSTRUCTIONS_NEW" "$AGENT_HOME/.chaos/helixkit-hooks.md" 2>/dev/null || true
+chown -R 1000:1000 "$AGENT_REPO_PATH" "$AGENT_HOME/work" "$AGENT_HOME/state" "$AGENT_HOME/identity/automation" "$AGENT_HOME/identity/memory" "$AGENT_HOME/.chaos/helixkit-hooks.md" 2>/dev/null || true
 
 # Some chaos providers read API keys directly from the environment (Anthropic),
 # while others require a provider account entry under the agent user's ~/.chaos.
@@ -203,6 +166,35 @@ register_provider_key() {
 
 register_provider_key anthropic "$ANTHROPIC_API_KEY"
 register_provider_key openai "$OPENAI_API_KEY"
+
+# Keep one matching Chaos journal daemon alive for the lifetime of the hosted
+# runtime. Long-running provider turns and later resume processes must share the
+# same socket instead of relying on per-command detached bootstrap. Keep the
+# post-storage-refactor journal separate from legacy chaos.sqlite databases:
+# SQLx correctly refuses to reuse a database whose original migration changed.
+export CHAOS_HOME="${CHAOS_HOME:-$AGENT_HOME/.chaos}"
+export CHAOS_JOURNALD_SOCKET="${CHAOS_JOURNALD_SOCKET:-$CHAOS_HOME/run/journald.sock}"
+CHAOS_JOURNALD_DB="${CHAOS_JOURNALD_DB:-$CHAOS_HOME/journal.sqlite}"
+mkdir -p "$(dirname "$CHAOS_JOURNALD_SOCKET")"
+chown -R 1000:1000 "$CHAOS_HOME"
+gosu agent chaos_journald \
+    --socket "$CHAOS_JOURNALD_SOCKET" \
+    --db "$CHAOS_JOURNALD_DB" &
+CHAOS_JOURNALD_PID=$!
+
+attempt=0
+while [ ! -S "$CHAOS_JOURNALD_SOCKET" ]; do
+    if ! kill -0 "$CHAOS_JOURNALD_PID" 2>/dev/null; then
+        echo "chaos_journald stopped before creating its socket" >&2
+        exit 1
+    fi
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 100 ]; then
+        echo "timed out waiting for chaos_journald socket" >&2
+        exit 1
+    fi
+    sleep 0.05
+done
 
 # Optional local guardrail if the identity volume is itself a git working tree.
 # The hosted path does not require git, but agents may initialize it for local

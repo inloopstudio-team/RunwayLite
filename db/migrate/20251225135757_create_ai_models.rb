@@ -11,22 +11,20 @@ class CreateAiModels < ActiveRecord::Migration[8.1]
       t.integer :context_window
       t.integer :max_output_tokens
       t.date :knowledge_cutoff
-      t.jsonb :modalities, default: {}
-      t.jsonb :capabilities, default: []
-      t.jsonb :pricing, default: {}
-      t.jsonb :metadata, default: {}
+      t.text :modalities, default: '{}'
+      t.text :capabilities, default: '[]'
+      t.text :pricing, default: '{}'
+      t.text :metadata, default: '{}'
       t.timestamps
 
       t.index [ :provider, :model_id ], unique: true
       t.index :provider
       t.index :family
-      t.index :capabilities, using: :gin
-      t.index :modalities, using: :gin
     end
 
-    # Rename existing model_id string columns to model_id_string
-    rename_column :chats, :model_id, :model_id_string
-    rename_column :messages, :model_id, :model_id_string
+    # SQLite 3.25+ supports RENAME COLUMN; use raw SQL instead of rename_column
+    execute "ALTER TABLE chats RENAME COLUMN model_id TO model_id_string"
+    execute "ALTER TABLE messages RENAME COLUMN model_id TO model_id_string"
 
     # Add foreign key references to ai_models
     add_reference :chats, :ai_model, foreign_key: true

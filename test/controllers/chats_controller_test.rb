@@ -28,31 +28,256 @@ class ChatsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "new chat excludes agents whose hosted runtime is still being prepared" do
+    provisioning_agent = agents(:research_assistant)
+    provisioning_agent.update!(
+      runtime: "provisioning",
+      birth_committed_at: Time.current
+    )
+
+    get new_account_chat_path(@account)
+
+    assert_response :success
+    agent_ids = inertia_shared_props.fetch("agents").pluck("id")
+    assert_not_includes agent_ids, provisioning_agent.to_param
+    assert_includes agent_ids, agents(:code_reviewer).to_param
+  end
+
+  test "index redirects to agent creation when no active agents exist" do
+    @account.agents.update_all(active: false)
+
+    get account_chats_path(@account)
+
+    assert_redirected_to account_agents_path(@account, create: true)
+    assert_equal "Create an agent before starting a conversation", flash[:alert]
+  end
+
+  test "new redirects to agent creation when no active agents exist" do
+    @account.agents.update_all(active: false)
+
+    get new_account_chat_path(@account)
+
+    assert_redirected_to account_agents_path(@account, create: true)
+    assert_equal "Create an agent before starting a conversation", flash[:alert]
+  end
+
   test "should show chat" do
     get account_chat_path(@account, @chat)
     assert_response :success
   end
 
-  test "should create chat with default model" do
+  test "show includes conversation cost breakdown" do
+    @chat.messages.create!(
+      role: "assistant",
+      content: "Measured response",
+      model_id_string: "openai/gpt-5.4",
+      input_tokens: 100,
+      cache_creation_tokens: 20,
+      cached_tokens: 30,
+      output_tokens: 40,
+      thinking_tokens: 10
+    )
+
+    get account_chat_path(@account, @chat)
+
+    breakdown = inertia_shared_props["cost_breakdown"]
+    assert_equal 1, breakdown["row_count"]
+    assert_equal "openai/gpt-5.4", breakdown.dig("models", 0, "model")
+    assert_equal 30, breakdown.dig("totals", "cache_read_input_tokens")
+  end
+
+  test "show omits per-message RubyLLM telemetry for non-site-admins" do
+    @chat.messages.create!(
+      role: "assistant",
+      content: "Measured response",
+      model_id_string: "openai/gpt-5.4",
+      input_tokens: 100,
+      cache_creation_tokens: 20,
+      cached_tokens: 30,
+      output_tokens: 40
+    )
+
+    get account_chat_path(@account, @chat)
+
+    message = inertia_shared_props["messages"].find { |row| row["role"] == "assistant" }
+    refute message.key?("ruby_llm_telemetry")
+  end
+
+  test "show includes per-message RubyLLM telemetry for site admins" do
+    @chat.messages.create!(
+      role: "assistant",
+      content: "Measured response",
+      model_id_string: "openai/gpt-5.4",
+      input_tokens: 100,
+      cache_creation_tokens: 20,
+      cached_tokens: 30,
+      output_tokens: 40
+    )
+    delete logout_path
+    post login_path, params: {
+      email_address: users(:site_admin_user).email_address,
+      password: "password123"
+    }
+
+    get account_chat_path(@account, @chat)
+
+    message = inertia_shared_props["messages"].find { |row| row["role"] == "assistant" }
+    assert_equal(
+      {
+        "model" => "openai/gpt-5.4",
+        "instrumentation_complete" => true,
+        "input_tokens" => 100,
+        "output_tokens" => 40,
+        "cache_read_tokens" => 30,
+        "cache_write_tokens" => 20
+      },
+      message["ruby_llm_telemetry"]
+    )
+  end
+
+  test "show includes estimated interaction cost on an unambiguously linked hosted response" do
+    agent = agents(:research_assistant)
+    started_at = 1.minute.ago
+    message = @chat.messages.create!(
+      role: "assistant",
+      agent: agent,
+      content: "Hosted response",
+      created_at: started_at + 10.seconds
+    )
+    @chat.agent_runtime_interactions.create!(
+      agent: agent,
+      trigger_kind: "conversation",
+      started_at: started_at,
+      finished_at: started_at + 20.seconds,
+      telemetry_schema_version: 1,
+      usage_scope: "trigger",
+      usage_complete: true,
+      provider: "anthropic",
+      model: "claude-sonnet-5",
+      uncached_input_tokens: 1_000,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      output_tokens: 25
+    )
+
+    get account_chat_path(@account, @chat)
+
+    response_message = inertia_shared_props["messages"].find { |row| row["id"] == message.to_param }
+    assert_equal "0.00225", response_message.dig("interaction_cost", "amount_usd")
+  end
+
+  test "show omits interaction cost when one interaction posted several messages" do
+    agent = agents(:research_assistant)
+    started_at = 1.minute.ago
+    messages = [
+      @chat.messages.create!(role: "assistant", agent: agent, content: "First", created_at: started_at + 10.seconds),
+      @chat.messages.create!(role: "assistant", agent: agent, content: "Second", created_at: started_at + 15.seconds)
+    ]
+    @chat.agent_runtime_interactions.create!(
+      agent: agent,
+      trigger_kind: "conversation",
+      started_at: started_at,
+      finished_at: started_at + 20.seconds,
+      telemetry_schema_version: 1,
+      usage_scope: "trigger",
+      usage_complete: true,
+      provider: "anthropic",
+      model: "claude-sonnet-5",
+      uncached_input_tokens: 1_000,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      output_tokens: 25
+    )
+
+    get account_chat_path(@account, @chat)
+
+    response_messages = inertia_shared_props["messages"].select { |row| row["id"].in?(messages.map(&:to_param)) }
+    assert response_messages.none? { |row| row.key?("interaction_cost") }
+  end
+
+  test "show includes estimated interaction cost for a wake with one obvious chat response" do
+    agent = agents(:research_assistant)
+    started_at = 1.minute.ago
+    message = @chat.messages.create!(
+      role: "assistant",
+      agent: agent,
+      content: "A wake response",
+      created_at: started_at + 10.seconds
+    )
+    AgentRuntimeInteraction.create!(
+      agent: agent,
+      chat: nil,
+      trigger_kind: "wake",
+      started_at: started_at,
+      finished_at: started_at + 20.seconds,
+      telemetry_schema_version: 1,
+      usage_scope: "trigger",
+      usage_complete: true,
+      provider: "anthropic",
+      model: "claude-sonnet-5",
+      uncached_input_tokens: 1_000,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      output_tokens: 25
+    )
+
+    get account_chat_path(@account, @chat)
+
+    response_message = inertia_shared_props["messages"].find { |row| row["id"] == message.to_param }
+    assert_equal "0.00225", response_message.dig("interaction_cost", "amount_usd")
+  end
+
+  test "should create chat with agents" do
+    agent = agents(:research_assistant)
+
     assert_difference "Chat.count" do
-      post account_chats_path(@account)
+      post account_chats_path(@account), params: { agent_ids: [ agent.to_param ] }
     end
 
     chat = Chat.last
     assert_equal "openrouter/auto", chat.model_id
     assert_equal @account, chat.account
+    assert chat.manual_responses?
+    assert_equal [ agent ], chat.agents
     assert_redirected_to account_chat_path(@account, chat)
   end
 
-  test "should create chat with custom model" do
-    assert_difference "Chat.count" do
-      post account_chats_path(@account), params: {
-        chat: { model_id: "gpt-4o" }
-      }
-    end
+  test "should ignore model chat attributes when creating a chat" do
+    agent = agents(:research_assistant)
+
+    post account_chats_path(@account), params: {
+      chat: {
+        model_id: "gpt-4o",
+        web_access: true,
+        manual_responses: false
+      },
+      agent_ids: [ agent.to_param ]
+    }
 
     chat = Chat.last
-    assert_equal "gpt-4o", chat.model_id
+    assert_equal "openrouter/auto", chat.model_id
+    assert_not chat.web_access?
+    assert chat.manual_responses?
+  end
+
+  test "should not create chat without agents" do
+    assert_no_difference "Chat.count" do
+      post account_chats_path(@account)
+    end
+
+    assert_redirected_to new_account_chat_path(@account)
+    assert_equal "Select at least one agent", flash[:alert]
+  end
+
+  test "should not create chat with an agent from another account" do
+    other_agent = agents(:other_account_agent)
+
+    assert_no_difference "Chat.count" do
+      post account_chats_path(@account), params: { agent_ids: [ other_agent.to_param ] }
+    end
+
+    assert_redirected_to new_account_chat_path(@account)
+    assert_equal "Select valid agents from this account", flash[:alert]
   end
 
   test "should destroy chat" do
@@ -99,13 +324,15 @@ class ChatsControllerTest < ActionDispatch::IntegrationTest
     assert_response :redirect
   end
 
-  test "should create chat with message and trigger AI response" do
+  test "should create agent chat with message without triggering plain AI response" do
+    agent = agents(:research_assistant)
+
     assert_difference "Chat.count" do
       assert_difference "Message.count" do
-        assert_enqueued_with(job: AiResponseJob) do
+        assert_no_enqueued_jobs only: AiResponseJob do
           post account_chats_path(@account), params: {
-            chat: { model_id: "gpt-4o" },
-            message: "Hello AI"
+            message: "Hello agent",
+            agent_ids: [ agent.to_param ]
           }
         end
       end
@@ -113,22 +340,24 @@ class ChatsControllerTest < ActionDispatch::IntegrationTest
 
     chat = Chat.last
     message = chat.messages.last
-    assert_equal "Hello AI", message.content
+    assert_equal "Hello agent", message.content
     assert_equal "user", message.role
     assert_equal @user, message.user
+    assert_equal [ agent ], chat.agents
     assert_redirected_to account_chat_path(@account, chat)
   end
 
   test "should create chat with file attachments" do
+    agent = agents(:research_assistant)
     file = fixture_file_upload("test_image.png", "image/png")
 
     assert_difference "Chat.count" do
       assert_difference "Message.count" do
-        assert_enqueued_with(job: AiResponseJob) do
+        assert_no_enqueued_jobs only: AiResponseJob do
           post account_chats_path(@account), params: {
-            chat: { model_id: "gpt-4o" },
             message: "Please analyze this image",
-            files: [ file ]
+            files: [ file ],
+            agent_ids: [ agent.to_param ]
           }
         end
       end
@@ -149,15 +378,16 @@ class ChatsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should create chat with only files and no message content" do
+    agent = agents(:research_assistant)
     file = fixture_file_upload("test_image.png", "image/png")
 
     assert_difference "Chat.count" do
       assert_difference "Message.count" do
-        assert_enqueued_with(job: AiResponseJob) do
+        assert_no_enqueued_jobs only: AiResponseJob do
           post account_chats_path(@account), params: {
-            chat: { model_id: "gpt-4o" },
             message: "", # Empty message content
-            files: [ file ]
+            files: [ file ],
+            agent_ids: [ agent.to_param ]
           }
         end
       end
@@ -227,15 +457,16 @@ class ChatsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should create chat with file uploads" do
+    agent = agents(:research_assistant)
     # Create a test file
     file = fixture_file_upload("test.txt", "text/plain")
 
     assert_difference "Chat.count" do
       assert_difference "Message.count" do
         post account_chats_path(@account), params: {
-          chat: { model_id: "gpt-4o" },
           message: "Hello with file",
-          files: [ file ]
+          files: [ file ],
+          agent_ids: [ agent.to_param ]
         }
       end
     end
@@ -465,6 +696,34 @@ class ChatsControllerTest < ActionDispatch::IntegrationTest
     # All returned messages should have IDs less than the middle message
     returned_ids = json["messages"].map { |m| Message.decode_id(m["id"]) }
     assert returned_ids.all? { |id| id < middle.id }
+  end
+
+  test "messages index includes per-message RubyLLM telemetry for site admins" do
+    chat = @account.chats.create!(model_id: "openrouter/auto")
+    assistant_message = chat.messages.create!(
+      role: "assistant",
+      content: "Older measured response",
+      model_id_string: "anthropic/claude-opus-4-6",
+      input_tokens: 200,
+      output_tokens: 50,
+      cached_tokens: 150,
+      cache_creation_tokens: 25
+    )
+    newer_message = chat.messages.create!(role: "user", content: "Newer message", user: @user)
+    delete logout_path
+    post login_path, params: {
+      email_address: users(:site_admin_user).email_address,
+      password: "password123"
+    }
+
+    get account_chat_messages_path(@account, chat, before_id: newer_message.to_param),
+        headers: { "Accept" => "application/json" }
+
+    assert_response :success
+    json = JSON.parse(response.body)
+    message = json["messages"].find { |row| row["id"] == assistant_message.to_param }
+    assert_equal 150, message.dig("ruby_llm_telemetry", "cache_read_tokens")
+    assert_equal 25, message.dig("ruby_llm_telemetry", "cache_write_tokens")
   end
 
   test "messages index returns empty when no more messages" do

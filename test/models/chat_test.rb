@@ -9,6 +9,7 @@ class ChatTest < ActiveSupport::TestCase
     )
     @user.profile.update!(first_name: "Test", last_name: "User")
     @account = @user.personal_account
+    @account.update!(use_system_ai_credentials: true)
   end
 
   test "belongs to account" do
@@ -68,6 +69,16 @@ class ChatTest < ActiveSupport::TestCase
     assert chat.respond_to?(:ask)
     # Note: generate_title is not a direct method, it's handled by the job
     assert chat.respond_to?(:to_llm)
+  end
+
+  test "builds direct-provider chat for models missing from RubyLLM registry" do
+    chat = Chat.create!(
+      account: @account,
+      model_id: "openai/gpt-5.6-sol",
+      title: "Future model"
+    )
+
+    assert_nothing_raised { chat.to_llm }
   end
 
   test "broadcasts to account" do
@@ -754,6 +765,27 @@ end
     assert_not_includes user_msg[:content].to_s, "[voice message, audio_id:"
   end
 
+  test "Anthropic context caches the stable system prefix before the context envelope" do
+    agent = @account.agents.create!(
+      name: "Cached Claude",
+      system_prompt: "Stable identity",
+      model_id: "anthropic/claude-opus-4.6"
+    )
+    chat = @account.chats.new(title: "Cache test", manual_responses: true, model_id: agent.model_id)
+    chat.agent_ids = [ agent.id ]
+    chat.save!
+
+    context = chat.build_context_for_agent(agent, provider: :anthropic)
+
+    assert_instance_of RubyLLM::Content::Raw, context.first[:content]
+    assert_includes context.first[:content].value.first[:text], "Stable identity"
+    assert_includes context.first[:content].value.first[:text], "Each activation includes a `<helixkit_context>` block"
+    assert_not_includes context.first[:content].value.first[:text], "Current time:"
+    assert_equal({ type: "ephemeral", ttl: "1h" }, context.first[:content].value.first[:cache_control])
+    assert_includes context.second[:content], "Current time:"
+    assert_includes context.second[:content], "Cache test"
+  end
+
   # Cross-conversation context tests
 
   test "format_cross_conversation_context returns nil when no other conversations" do
@@ -782,12 +814,12 @@ end
     ca2.update_columns(agent_summary: "Discussing API design patterns", agent_summary_generated_at: 1.minute.ago)
 
     context = chat1.build_context_for_agent(agent)
-    system_content = context.first[:content]
+    envelope_content = context.last[:content]
 
-    assert_includes system_content, "Your Other Active Conversations"
-    assert_includes system_content, "Other Chat"
-    assert_includes system_content, "Discussing API design patterns"
-    assert_includes system_content, chat2.obfuscated_id
+    assert_includes envelope_content, "Your Other Active Conversations"
+    assert_includes envelope_content, "Other Chat"
+    assert_includes envelope_content, "Discussing API design patterns"
+    assert_includes envelope_content, chat2.obfuscated_id
   end
 
   test "format_borrowed_context returns nil when no borrowed context" do
@@ -817,12 +849,12 @@ end
     })
 
     context = chat.build_context_for_agent(agent)
-    system_content = context.first[:content]
+    envelope_content = context.last[:content]
 
-    assert_includes system_content, "Borrowed Context from Conversation abcdef"
-    assert_includes system_content, "[Alice]: Can you review the PR?"
-    assert_includes system_content, "[Bot]: I will review it now."
-    assert_includes system_content, "will not appear in future activations"
+    assert_includes envelope_content, "Borrowed Context from Conversation abcdef"
+    assert_includes envelope_content, "[Alice]: Can you review the PR?"
+    assert_includes envelope_content, "[Bot]: I will review it now."
+    assert_includes envelope_content, "will not appear in future activations"
 
     # Verify context is NOT consumed (still present)
     assert ca.reload.borrowed_context_json.present?

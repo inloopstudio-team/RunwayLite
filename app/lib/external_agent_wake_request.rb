@@ -1,36 +1,12 @@
 class ExternalAgentWakeRequest
 
-  def initialize(agent:, requested_by: "HelixKit hourly wake")
+  def initialize(agent:, requested_by: "HelixKit scheduled wake")
     @agent = agent
     @requested_by = requested_by
   end
 
   def call
-    return { status: 503, error: "external runtime unreachable" } if agent.offline? || agent_unhealthy?
-
-    endpoint_url = Agents::Endpoint.url_for(agent)
-    session_id = "#{agent.uuid}-wake"
-    request = request_text
-
-    AgentRuntimeInteraction.record_trigger!(
-      agent: agent,
-      chat: nil,
-      trigger_kind: "wake",
-      conversation_id: nil,
-      requested_by: requested_by,
-      session_id: session_id,
-      endpoint_url: endpoint_url,
-      request_text: request
-    ) do
-      ChaosTriggerClient.new(endpoint_url, agent.trigger_bearer_token).request_response(
-        conversation_id: nil,
-        requested_by: requested_by,
-        session_id: session_id,
-        trigger_kind: "wake",
-        request: request,
-        model: Agents::Sandbox.chaos_model_for(agent)
-      )
-    end
+    Agents::Sandbox.new(agent).with_runtime { perform }
   rescue StandardError => e
     Rails.logger.warn "[ExternalAgentWakeRequest] #{agent.id} wake failed: #{e.class}: #{e.message}"
     { status: 0, error: e.message }
@@ -40,14 +16,55 @@ class ExternalAgentWakeRequest
 
   attr_reader :agent, :requested_by
 
+  def perform
+    return { status: 503, error: "external runtime unreachable" } if agent.offline? || agent_unhealthy?
+
+    endpoint_url = Agents::Endpoint.url_for(agent)
+    session_id = "#{agent.uuid}-wake"
+    request = request_text
+    auth_mode = agent.provider_auth_mode(provider)
+
+    AgentRuntimeInteraction.record_trigger!(
+      agent: agent,
+      chat: nil,
+      trigger_kind: "wake",
+      conversation_id: nil,
+      requested_by: requested_by,
+      session_id: session_id,
+      endpoint_url: endpoint_url,
+      request_text: request,
+      provider_auth_mode: auth_mode
+    ) do
+      ChaosTriggerClient.new(endpoint_url, agent.trigger_bearer_token).request_response(
+        conversation_id: nil,
+        requested_by: requested_by,
+        session_id: session_id,
+        trigger_kind: "wake",
+        request: request,
+        persistent_session: agent.persistent_wake_session?,
+        provider: provider,
+        model: Agents::Sandbox.chaos_model_for(agent),
+        reasoning_effort: agent.reasoning_effort,
+        auth_mode: auth_mode
+      )
+    end
+  end
+
+  def provider
+    @provider ||= Agents::Sandbox.chaos_provider_for(agent)
+  end
+
   def agent_unhealthy?
     agent.health_state == "unhealthy" && agent.consecutive_health_failures >= 6
   end
 
   def request_text
     now = Time.current
-    <<~TEXT
-      HelixKit is inviting you to wake for an hourly self-directed session.
+    [
+      Notices::Renderer.section_for(agent),
+      AgentAttentionRenderer.section_for(agent),
+      <<~TEXT
+      HelixKit is inviting you to wake for a scheduled self-directed session.
 
       Current time: #{now.iso8601}
       Current UTC time: #{now.utc.iso8601}
@@ -57,7 +74,7 @@ class ExternalAgentWakeRequest
 
       If you want to act, choose your own appropriate work for this wake session. Examples:
 
-      - Read HelixKit conversations or whiteboards through ~/identity/helixkit-api.md and post to HelixKit if you have something useful, timely, and non-noisy to say.
+      - Read HelixKit conversations or whiteboards through the current runtime-owned manual at `/usr/local/share/helixkit-agent/helixkit-api.md` and post to HelixKit if you have something useful, timely, and non-noisy to say.
       - Examine your repository folders, identity, journals, or memory files and do small tidying or self-maintenance.
       - Improve your own scaffolding in a bounded, reviewable way.
       - Do something else you freely choose within your available tools, shell, and network access, if it is genuinely worthwhile.
@@ -76,7 +93,8 @@ class ExternalAgentWakeRequest
       - Treat identity/soul.md as protected defining identity. Do not change it without explicit Daniel review/approval; the runtime also has a Git pre-commit guard for this.
 
       If there is no useful action to take, simply finish without posting or changing files.
-    TEXT
+      TEXT
+    ].compact_blank.join("\n\n")
   end
 
 end

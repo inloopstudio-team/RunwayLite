@@ -1,10 +1,11 @@
 <script>
   import { useForm, router } from '@inertiajs/svelte';
   import { Button } from '$lib/components/shadcn/button/index.js';
-  import { IdentificationCard, Palette, Cpu, Plug, Notebook, CloudArrowUp } from 'phosphor-svelte';
+  import { Palette, Gear, Plug, CloudArrowUp, TerminalWindow, CurrencyDollar } from 'phosphor-svelte';
   import {
     accountAgentsPath,
     accountAgentPath,
+    onboardingAccountAgentPath,
     accountAgentTelegramTestPath,
     accountAgentTelegramWebhookPath,
     accountAgentRefinementPath,
@@ -17,13 +18,16 @@
     sendTestRequestAccountAgentPath,
   } from '@/routes';
   import { useSync } from '$lib/use-sync';
+  import { siteName } from '$lib/branding';
   import AgentAppearancePanel from '$lib/components/agents/AgentAppearancePanel.svelte';
   import AgentEditHeader from '$lib/components/agents/AgentEditHeader.svelte';
-  import AgentIdentityPanel from '$lib/components/agents/AgentIdentityPanel.svelte';
   import AgentIntegrationsPanel from '$lib/components/agents/AgentIntegrationsPanel.svelte';
   import AgentMemoryPanel from '$lib/components/agents/AgentMemoryPanel.svelte';
-  import AgentModelPanel from '$lib/components/agents/AgentModelPanel.svelte';
+  import AgentSettingsPanel from '$lib/components/agents/AgentSettingsPanel.svelte';
   import AgentSettingsTabs from '$lib/components/agents/AgentSettingsTabs.svelte';
+  import AgentInteractionsPanel from '$lib/components/agents/AgentInteractionsPanel.svelte';
+  import AgentCostsPanel from '$lib/components/agents/AgentCostsPanel.svelte';
+  import AgentProviderSubscriptionPanel from '$lib/components/agents/AgentProviderSubscriptionPanel.svelte';
 
   let {
     agent,
@@ -32,29 +36,37 @@
     memories = [],
     grouped_models = {},
     available_tools = [],
-    available_voices = [],
     colour_options = [],
     icon_options = [],
     active_tab: activeTabProp = null,
     local_dev_endpoint_mode: localDevEndpointMode = false,
     identity_export_url: identityExportUrl = null,
     hosting_diagnostics_url: hostingDiagnosticsUrl = null,
+    runtime_observability_url: runtimeObservabilityUrl = null,
     sandbox_recreation_url: sandboxRecreationUrl = null,
-    runtime_interactions: runtimeInteractions = [],
+    provider_subscription: providerSubscription = null,
+    service_connections: serviceConnections = [],
+    can_manage_provider_subscription: canManageProviderSubscription = false,
+    interactions = [],
+    interactions_pagination: interactionsPagination = {},
+    cost_report: costReport = {},
     account,
   } = $props();
 
   useSync({
-    [`Agent:${agent.id}`]: ['agent', 'memories', 'runtime_interactions'],
+    [`Agent:${agent.id}`]: ['agent', 'memories', 'interactions', 'interactions_pagination', 'cost_report'],
   });
 
   let selectedModel = $state(agent.model_id);
   let sendingTestNotification = $state(false);
   let registeringWebhook = $state(false);
   let triggeringRefinement = $state(false);
-  let activeTab = $state(activeTabProp || 'identity');
-  let identityLocked = $derived(agent.runtime === 'external' || agent.runtime === 'offline');
-  let runtimeManaged = $derived(agent.runtime === 'external' || agent.runtime === 'offline');
+  let activeTab = $state(
+    activeTabProp === 'identity' ? 'appearance' : activeTabProp === 'model' ? 'settings' : activeTabProp || 'appearance'
+  );
+  let runtimeManaged = $derived(
+    Boolean(agent.birth_committed_at) || agent.runtime === 'external' || agent.runtime === 'offline'
+  );
   let promoting = $state(false);
   let sendingTestRequest = $state(false);
   let sendingOrientation = $state(false);
@@ -64,10 +76,14 @@
   let sandboxStatus = $state({
     docker_available: null,
     image_present: agent.container_image ? null : false,
-    container_exists: agent.container_name && (agent.runtime === 'external' || agent.runtime === 'migrating'),
+    container_exists:
+      agent.container_name &&
+      (agent.runtime === 'external' || agent.runtime === 'migrating' || agent.runtime === 'provisioning'),
     identity_volume_exists: agent.uuid ? null : false,
     chaos_volume_exists: agent.uuid ? null : false,
     repo_volume_exists: agent.uuid ? null : false,
+    work_volume_exists: agent.uuid ? null : false,
+    state_volume_exists: agent.uuid ? null : false,
   });
   let filesystemDump = $state({});
   let containerFilesystemDump = $state({});
@@ -76,7 +92,12 @@
   let diagnosticsLoading = $state(false);
   let diagnosticsLoaded = $state(false);
   let diagnosticsError = $state(null);
-  let showFormActions = $derived(!runtimeManaged || activeTab === 'appearance' || activeTab === 'integrations');
+  let showFormActions = $derived(
+    activeTab !== 'interactions' &&
+      activeTab !== 'costs' &&
+      activeTab !== 'integrations' &&
+      (!runtimeManaged || activeTab === 'appearance' || activeTab === 'settings' || activeTab === 'hosting')
+  );
   let filesystemSections = $derived([
     {
       title: 'Container home filesystem',
@@ -96,12 +117,12 @@
   ]);
 
   const tabs = [
-    { id: 'identity', label: 'Identity', icon: IdentificationCard },
     { id: 'appearance', label: 'Appearance', icon: Palette },
-    { id: 'model', label: 'Model', icon: Cpu },
+    { id: 'settings', label: 'Settings', icon: Gear },
     { id: 'integrations', label: 'Integrations', icon: Plug },
-    { id: 'memory', label: 'Memory', icon: Notebook },
     { id: 'hosting', label: 'Hosting', icon: CloudArrowUp },
+    { id: 'interactions', label: 'Sessions', icon: TerminalWindow },
+    { id: 'costs', label: 'Costs', icon: CurrencyDollar },
   ];
 
   let beginPromotePath = $derived(beginPromoteAccountAgentPath(account.id, agent.id));
@@ -118,12 +139,6 @@
   let form = useForm({
     agent: {
       name: agent.name,
-      system_prompt: agent.system_prompt || '',
-      reflection_prompt: agent.reflection_prompt || '',
-      memory_reflection_prompt: agent.memory_reflection_prompt || '',
-      summary_prompt: agent.summary_prompt || '',
-      refinement_prompt: agent.refinement_prompt || '',
-      refinement_threshold: agent.refinement_threshold ?? 0.9,
       model_id: agent.model_id,
       active: agent.active,
       paused: agent.paused || false,
@@ -132,9 +147,13 @@
       icon: agent.icon || null,
       thinking_enabled: agent.thinking_enabled || false,
       thinking_budget: agent.thinking_budget || 10000,
+      reasoning_effort: agent.reasoning_effort || 'default',
       telegram_bot_username: agent.telegram_bot_username || '',
       telegram_bot_token: agent.telegram_bot_token || '',
-      voice_id: agent.voice_id || '',
+      persistent_session: agent.persistent_session || false,
+      persistent_wake_session: agent.persistent_wake_session || false,
+      scheduled_wakes_enabled: agent.scheduled_wakes_enabled ?? true,
+      heartbeat_wakes_per_day: agent.heartbeat_wakes_per_day ?? 2,
     },
   });
 
@@ -397,7 +416,7 @@
       .then((response) => response.json().then((body) => ({ ok: response.ok, body })))
       .then(({ ok, body }) => {
         orientationResult = ok ? body : { status: 'transport_failed', error: body.error || 'Orientation failed' };
-        router.reload({ only: ['agent', 'runtime_interactions'], preserveScroll: true });
+        router.reload({ only: ['agent', 'interactions'], preserveScroll: true });
         loadHostingDiagnostics();
       })
       .catch((error) => {
@@ -426,29 +445,21 @@
 
       <!-- Content area -->
       <div class="flex-1 min-w-0 space-y-6">
-        {#if activeTab === 'identity'}
-          <AgentIdentityPanel {form} {identityLocked} />
-        {:else if activeTab === 'appearance'}
+        {#if activeTab === 'appearance'}
           <AgentAppearancePanel
+            bind:name={$form.agent.name}
             bind:colour={$form.agent.colour}
             bind:icon={$form.agent.icon}
-            bind:voiceId={$form.agent.voice_id}
+            nameError={$form.errors.name}
             colourOptions={colour_options}
-            iconOptions={icon_options}
-            availableVoices={available_voices} />
-        {:else if activeTab === 'model'}
-          <AgentModelPanel
+            iconOptions={icon_options} />
+        {:else if activeTab === 'settings'}
+          <AgentSettingsPanel
             {form}
             groupedModels={grouped_models}
             availableTools={available_tools}
-            locked={runtimeManaged}
+            {runtimeManaged}
             bind:selectedModel />
-          {#if runtimeManaged}
-            <div class="border rounded-lg p-4 text-sm text-muted-foreground">
-              Model, thinking, and tool settings are managed by the external runtime. Change them in the hosted
-              filesystem or rebuild/recreate the sandbox.
-            </div>
-          {/if}
         {:else if activeTab === 'integrations'}
           <AgentIntegrationsPanel
             {form}
@@ -457,6 +468,7 @@
             {telegramSubscriberCount}
             {sendingTestNotification}
             {registeringWebhook}
+            {serviceConnections}
             onsendTestNotification={sendTestNotification}
             onregisterWebhook={registerWebhook} />
         {:else if activeTab === 'memory'}
@@ -498,7 +510,7 @@
 
               {#if agent.sandbox_last_error}
                 <div class="rounded border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                  <div class="font-medium">Last promotion error</div>
+                  <div class="font-medium">Last hosting error</div>
                   <div class="mt-1 font-mono text-xs whitespace-pre-wrap">{agent.sandbox_last_error}</div>
                   {#if agent.sandbox_last_error_at}
                     <div class="mt-1 text-xs opacity-80">At {agent.sandbox_last_error_at}</div>
@@ -509,8 +521,8 @@
               {#if agent.runtime === 'inline'}
                 <div class="space-y-3">
                   <p class="text-sm text-muted-foreground">
-                    Run this agent in a RunwayLite-managed Docker sandbox. RunwayLite will create the identity volume,
-                    start the runtime, and send requests to the external agent.
+                    Run this resident in a {$siteName}-managed Docker sandbox. {$siteName} will create the identity volume,
+                    start the runtime, and send requests to the resident's external runtime.
                     {#if localDevEndpointMode}
                       In local development, the shim port is published to <span class="font-mono">127.0.0.1</span>
                       automatically so this can be tested on your Mac.
@@ -525,23 +537,34 @@
                   <Button type="button" disabled>Promotion in progress...</Button>
                   <Button type="button" variant="outline" onclick={cancelPromotion}>Cancel</Button>
                 </div>
+              {:else if agent.runtime === 'provisioning'}
+                <div class="space-y-3">
+                  <p class="text-sm text-muted-foreground">
+                    This born-hosted resident is being prepared. Their initial seed is already committed and cannot be
+                    reopened for editing.
+                  </p>
+                  <a href={onboardingAccountAgentPath(account.id, agent.id)}>
+                    <Button type="button" variant="outline">View setup progress</Button>
+                  </a>
+                </div>
               {:else}
                 <div class="space-y-3">
                   <p class="text-sm text-muted-foreground">
-                    Identity fields in RunwayLite are now read-only backups. The running agent's identity lives in its
+                    Identity fields in {$siteName} are now read-only backups. The running resident's identity lives in its
                     hosted filesystem below.
                   </p>
                   <div class="rounded border bg-muted/30 p-3 text-sm">
                     <div class="font-medium">First-wake orientation</div>
-                    {#if agent.oriented_at}
-                      <p class="mt-1 text-muted-foreground">Oriented at {agent.oriented_at}.</p>
-                    {:else if orientationResult && orientationResult.status === 'orientation_sent'}
+                    {#if agent.orientation_completed_at}
+                      <p class="mt-1 text-muted-foreground">The most recent orientation wake completed.</p>
+                    {:else if agent.orientation_requested_at}
                       <p class="mt-1 text-muted-foreground">
-                        Orientation sent. No first journal entry has been detected yet.
+                        An orientation wake has been offered and may still be running.
                       </p>
                     {:else}
                       <p class="mt-1 text-muted-foreground">
-                        Not yet oriented. Send an invitation for the agent to read its files and find its footing.
+                        No orientation wake has been recorded yet. You can offer one without requiring any particular
+                        response.
                       </p>
                     {/if}
                   </div>
@@ -553,7 +576,7 @@
                       disabled={sendingOrientation || agent.health_state !== 'healthy'}>
                       {sendingOrientation
                         ? 'Orienting...'
-                        : agent.oriented_at
+                        : agent.orientation_requested_at
                           ? 'Re-send orientation'
                           : 'Send orientation'}
                     </Button>
@@ -581,10 +604,6 @@
               {#if orientationResult}
                 <div class="rounded border bg-muted p-3 text-sm">
                   <div>Orientation: <span class="font-mono">{orientationResult.status}</span></div>
-                  {#if orientationResult.oriented_at}<div>Oriented at: {orientationResult.oriented_at}</div>{/if}
-                  {#if orientationResult.oriented === false}
-                    <div class="text-muted-foreground">No new or grown daily journal file was detected.</div>
-                  {/if}
                   {#if orientationResult.error}<div class="text-destructive">{orientationResult.error}</div>{/if}
                   {#if orientationResult.runtime_stderr}
                     <details class="mt-2">
@@ -624,6 +643,32 @@
                 </div>
               {/if}
             </div>
+
+            {#if providerSubscription}
+              <div class="border rounded-lg p-6 space-y-3">
+                <div class="space-y-1">
+                  {#if providerSubscription.provider === 'anthropic'}
+                    <h2 class="text-xl font-semibold">Claude Code clamping</h2>
+                    <p class="text-sm text-muted-foreground">
+                      Connect this resident to a personal Claude subscription and choose the Claude Code clamp instead
+                      of metered Anthropic API billing. Chaos runs Claude Code inside the resident's hosted runtime; if
+                      the subscription is unavailable, the request fails rather than falling back to the API key.
+                    </p>
+                  {:else}
+                    <h2 class="text-xl font-semibold">Provider subscription account</h2>
+                    <p class="text-sm text-muted-foreground">
+                      Choose whether this resident uses an API key or a personal provider subscription. Provider tokens
+                      stay inside the resident's private runtime state volume and are never stored by {$siteName}.
+                    </p>
+                  {/if}
+                </div>
+                <AgentProviderSubscriptionPanel
+                  {account}
+                  subscriptionAgent={providerSubscription}
+                  canManage={canManageProviderSubscription}
+                  showAgentName={false} />
+              </div>
+            {/if}
 
             <div class="border rounded-lg p-6 space-y-3">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -729,11 +774,29 @@
                         : 'missing'}</span>
                 </p>
                 <p>
-                  Repo/workspace volume:
+                  Repository volume:
                   <span class="font-medium"
                     >{sandboxStatus.repo_volume_exists === null
                       ? 'checking'
                       : sandboxStatus.repo_volume_exists
+                        ? 'present'
+                        : 'missing'}</span>
+                </p>
+                <p>
+                  Work volume:
+                  <span class="font-medium"
+                    >{sandboxStatus.work_volume_exists === null
+                      ? 'checking'
+                      : sandboxStatus.work_volume_exists
+                        ? 'present'
+                        : 'missing'}</span>
+                </p>
+                <p>
+                  Private state volume:
+                  <span class="font-medium"
+                    >{sandboxStatus.state_volume_exists === null
+                      ? 'checking'
+                      : sandboxStatus.state_volume_exists
                         ? 'present'
                         : 'missing'}</span>
                 </p>
@@ -753,7 +816,7 @@
               {#if sandboxStatus.container_exists && sandboxStatus.container_image_current === false}
                 <div class="rounded border border-amber-300/40 bg-amber-50 p-3 text-sm text-amber-900">
                   This container was created from an older runtime image. Restarting promotion will recreate the
-                  container while preserving its identity and Chaos volumes.
+                  container while preserving its identity, session, repository, and work volumes.
                 </div>
               {/if}
               {#if sandboxStatus.container_error}
@@ -841,56 +904,16 @@
                 {/if}
               </div>
             {/each}
-
-            <div class="border rounded-lg p-6 space-y-3">
-              <h2 class="text-xl font-semibold">Recent runtime interactions</h2>
-              {#if runtimeInteractions.length === 0}
-                <p class="text-sm text-muted-foreground">No external runtime interactions have been recorded yet.</p>
-              {:else}
-                <div class="space-y-3">
-                  {#each runtimeInteractions as interaction}
-                    <details class="rounded border bg-muted p-3 text-sm">
-                      <summary class="cursor-pointer">
-                        <span class="font-medium">{interaction.trigger_kind}</span>
-                        <span class="text-muted-foreground">
-                          {interaction.created_at}
-                          · transport {interaction.transport_status ?? 'n/a'}
-                          · runtime {interaction.runtime_status ?? 'n/a'}
-                          {#if interaction.duration_ms}
-                            · {interaction.duration_ms}ms{/if}
-                        </span>
-                      </summary>
-                      <div class="mt-2 grid gap-1 text-xs">
-                        {#if interaction.conversation_id}<div>
-                            Conversation: <span class="font-mono">{interaction.conversation_id}</span>
-                          </div>{/if}
-                        {#if interaction.session_id}<div>
-                            Session: <span class="font-mono">{interaction.session_id}</span>
-                          </div>{/if}
-                        {#if interaction.error_message}<div class="text-destructive">
-                            {interaction.error_class}: {interaction.error_message}
-                          </div>{/if}
-                      </div>
-                      {#if interaction.stdout}
-                        <details class="mt-2">
-                          <summary class="cursor-pointer font-medium">stdout</summary>
-                          <pre
-                            class="mt-1 max-h-80 overflow-auto whitespace-pre-wrap text-xs">{interaction.stdout}</pre>
-                        </details>
-                      {/if}
-                      {#if interaction.stderr}
-                        <details class="mt-2">
-                          <summary class="cursor-pointer font-medium text-destructive">stderr</summary>
-                          <pre
-                            class="mt-1 max-h-80 overflow-auto whitespace-pre-wrap text-xs">{interaction.stderr}</pre>
-                        </details>
-                      {/if}
-                    </details>
-                  {/each}
-                </div>
-              {/if}
-            </div>
           </div>
+        {:else if activeTab === 'interactions'}
+          <AgentInteractionsPanel
+            {interactions}
+            pagination={interactionsPagination}
+            {account}
+            {agent}
+            {runtimeObservabilityUrl} />
+        {:else if activeTab === 'costs'}
+          <AgentCostsPanel report={costReport} />
         {/if}
 
         {#if showFormActions}
@@ -899,7 +922,7 @@
               <Button type="button" variant="outline">Cancel</Button>
             </a>
             <Button type="submit" disabled={$form.processing}>
-              {$form.processing ? 'Saving...' : 'Update Agent'}
+              {$form.processing ? 'Saving...' : 'Update Resident'}
             </Button>
           </div>
         {/if}

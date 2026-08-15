@@ -37,8 +37,7 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
         post accounts_path, params: {
           account: {
             name: "Writing Room",
-            account_type: "personal",
-            default_conversation_mode: "agents"
+            account_type: "personal"
           }
         }
       end
@@ -48,7 +47,6 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to account_chats_path(account)
     assert account.personal?
     assert_equal "Writing Room", account.name
-    assert_equal "agents", account.default_conversation_mode
     assert account.owned_by?(@user)
   end
 
@@ -80,25 +78,15 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Focused Work", @personal_account.reload.name
   end
 
-  test "should update default conversation mode" do
+  test "account owners cannot change shared AI credential fallback" do
+    @team_account.update!(use_system_ai_credentials: true)
+
     patch account_path(@team_account), params: {
-      account: {
-        name: @team_account.read_attribute(:name),
-        default_conversation_mode: "agents"
-      }
+      account: { use_system_ai_credentials: false }
     }
 
     assert_redirected_to @team_account
-    assert_equal "agents", @team_account.reload.default_conversation_mode
-  end
-
-  test "should update default conversation mode without name" do
-    patch account_path(@personal_account), params: {
-      account: { default_conversation_mode: "agents" }
-    }
-
-    assert_redirected_to @personal_account
-    assert_equal "agents", @personal_account.reload.default_conversation_mode
+    assert @team_account.reload.use_system_ai_credentials?
   end
 
   test "should convert personal to team" do
@@ -168,6 +156,25 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to @team_account
     assert_equal "Nope", @team_account.reload.read_attribute(:name)
+  end
+
+  test "confirmed member cannot replace account AI keys" do
+    @team_account.update!(openrouter_api_key: "owner-key")
+    member = users(:existing_user)
+    sign_in(member)
+
+    patch account_path(@team_account), params: {
+      account: {
+        name: "Still Collaborative",
+        openrouter_api_key: "member-controlled-key",
+        clear_ai_api_keys: [ "openrouter" ]
+      }
+    }
+
+    assert_redirected_to @team_account
+    @team_account.reload
+    assert_equal "Still Collaborative", @team_account.name
+    assert_equal "owner-key", @team_account.openrouter_api_key
   end
 
   test "unconfirmed invitee cannot access invited account" do

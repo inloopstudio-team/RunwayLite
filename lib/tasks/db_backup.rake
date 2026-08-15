@@ -1,4 +1,5 @@
 require "aws-sdk-s3"
+require "tempfile"
 
 module DbBackupHelpers
 
@@ -27,12 +28,24 @@ module DbBackupHelpers
   end
 
   def latest_backup_key
-    response = s3_client.list_objects_v2(bucket: bucket_name)
-    response.contents
-      .map(&:key)
-      .select { |k| k.end_with?(".sql.gz") }
-      .sort
-      .last
+    keys = []
+    continuation_token = nil
+
+    loop do
+      options = { bucket: bucket_name }
+      options[:continuation_token] = continuation_token if continuation_token
+      response = s3_client.list_objects_v2(**options)
+      keys.concat(response.contents.map(&:key).select { |key| key.end_with?(".sql.gz") })
+      break unless response.is_truncated
+
+      continuation_token = response.next_continuation_token
+    end
+
+    keys.max
+  end
+
+  def latest_downloaded_sql
+    Dir[download_path.join("*.sql")].max
   end
 
   def reset_user_passwords!
@@ -54,41 +67,78 @@ module DbBackupHelpers
       return
     end
 
-    puts "Creating test agents in #{nexus_account.name} account..."
+    creator = nexus_account.owner || nexus_account.users.first
+    unless creator
+      puts "Warning: #{nexus_account.name} has no user available to own test-agent API keys. Skipping test agent creation."
+      return
+    end
 
-    all_tools = Agent.available_tools.map(&:name)
-    tools_without_refinement = all_tools - %w[RefinementTool]
-    tools_without_refinement_and_audio = tools_without_refinement - %w[FetchAudioTool]
+    puts "Creating Chaos-backed test agents in #{nexus_account.name} account..."
 
     test_agents = [
-      { name: "Claude Test Agent", model_id: "anthropic/claude-sonnet-4.5", enabled_tools: tools_without_refinement_and_audio, colour: "violet", icon: "Sun" },
-      { name: "GPT Test Agent", model_id: "openai/gpt-5-mini", enabled_tools: tools_without_refinement_and_audio, colour: "sky", icon: "Lightning" },
-      { name: "Grok Test Agent", model_id: "x-ai/grok-3-mini", enabled_tools: tools_without_refinement_and_audio, colour: "pink", icon: "Sparkle" },
-      { name: "Gemini Test Agent", model_id: "google/gemini-2.5-flash", enabled_tools: tools_without_refinement, colour: "gray", icon: "PuzzlePiece" }
+      { name: "Claude Test Agent", model_id: "anthropic/claude-sonnet-4.5", colour: "violet", icon: "Sun" },
+      { name: "GPT Test Agent", model_id: "openai/gpt-5-mini", colour: "sky", icon: "Lightning" },
+      { name: "Grok Test Agent", model_id: "x-ai/grok-3-mini", colour: "pink", icon: "Sparkle" },
+      { name: "Gemini Test Agent", model_id: "google/gemini-2.5-flash", colour: "gray", icon: "PuzzlePiece" }
     ]
 
     test_agents.each do |config|
-      agent = nexus_account.agents.find_or_initialize_by(name: config[:name])
-      agent.assign_attributes(
-        system_prompt: "You are a test agent. Your purpose is to help with testing and development.",
-        model_id: config[:model_id],
-        enabled_tools: config[:enabled_tools],
-        colour: config[:colour],
-        icon: config[:icon],
-        active: true
-      )
-      if agent.save
-        puts "  Created/updated #{config[:name]} (#{config[:model_id]}, #{config[:enabled_tools].length} tools)"
-      else
-        puts "  Failed to create #{config[:name]}: #{agent.errors.full_messages.join(', ')}"
+      existing_agent = nexus_account.agents.find_by(name: config[:name])
+      if existing_agent && !existing_agent.inline?
+        PromoteAgentJob.perform_later(existing_agent.id) if existing_agent.migrating? || existing_agent.provisioning?
+        puts "  Kept #{config[:name]} on its existing Chaos runtime"
+        next
       end
+
+      if existing_agent
+        puts "  Replacing legacy inline #{config[:name]} with a Chaos-backed resident"
+        existing_agent.destroy!
+      end
+
+      agent = Agents::HostedBirth.new(
+        account: nexus_account,
+        creator: creator,
+        attributes: config.merge(
+          system_prompt: "You are a test agent. Your purpose is to help with testing and development."
+        )
+      ).create!
+      puts "  Created #{agent.name} (#{agent.model_id}); Chaos provisioning queued"
+    rescue ActiveRecord::RecordInvalid, Agents::HostedProvisioning::ConfigurationError => e
+      puts "  Failed to create #{config[:name]}: #{e.message}"
     end
 
-    puts "Test agents created."
+    puts "Chaos-backed test agents created."
   end
 
   def download_path
     Rails.root.join("db", "backups")
+  end
+
+  def refreshing?
+    Rake.application.top_level_tasks.include?("db_backup:refresh")
+  end
+
+  def with_psql_compatible_dump(sql_path)
+    Tempfile.create([ "helix-kit-restore-", ".sql" ], download_path) do |file|
+      File.foreach(sql_path) do |line|
+        # Newer patched pg_dump clients emit these psql safety commands, but
+        # older local psql patch releases reject them. This is our own trusted
+        # backup, so removing only the guard commands preserves the SQL payload.
+        next if line.match?(/\A\\(?:un)?restrict\b/)
+
+        file.write(line)
+      end
+      file.flush
+      yield file.path
+    end
+  end
+
+  def migrate_restored_database!
+    puts "Running local migrations against the restored database..."
+    ActiveRecord::Base.connection.schema_cache.clear!
+    Rake::Task["db:migrate"].reenable
+    Rake::Task["db:migrate"].invoke
+    ActiveRecord::Base.connection.schema_cache.clear!
   end
 
 end
@@ -145,7 +195,7 @@ namespace :db_backup do
   task restore: :environment do
     DbBackupHelpers.ensure_not_production!
 
-    latest_sql = Dir["#{DbBackupHelpers.download_path}/*.sql"].max_by { |f| File.mtime(f) }
+    latest_sql = DbBackupHelpers.latest_downloaded_sql
 
     abort "No SQL file found in #{DbBackupHelpers.download_path}. Run `rake db_backup:download` first." unless latest_sql
 
@@ -157,6 +207,7 @@ namespace :db_backup do
 
     puts "Restoring #{latest_sql} to #{dbname}..."
     puts "WARNING: This will DROP and recreate your local development database!"
+    puts "WARNING: It will also replace restored hosted-agent containers and Docker volumes." if Rails.env.development? && DbBackupHelpers.refreshing?
     print "Continue? (y/N): "
     response = $stdin.gets.chomp
     abort "Aborted." unless response.downcase == "y"
@@ -185,20 +236,23 @@ namespace :db_backup do
 
     # Restore from backup
     puts "Restoring from backup..."
-    restore_cmd = [ "psql", "-q" ]  # -q for quiet mode
+    restore_cmd = [ "psql", "-q", "-v", "ON_ERROR_STOP=1" ]  # -q for quiet mode
     restore_cmd.push("-h", host) if host
     restore_cmd.push("-U", username) if username
     restore_cmd.push("-d", dbname)
-    restore_cmd.push("-f", latest_sql)
 
-    puts "Running: #{restore_cmd.join(' ')}"
-    success = system(env, *restore_cmd)
+    success = DbBackupHelpers.with_psql_compatible_dump(latest_sql) do |restore_file|
+      command = restore_cmd + [ "-f", restore_file ]
+      puts "Running: #{command.join(' ')}"
+      system(env, *command)
+    end
 
     # Reconnect
     ActiveRecord::Base.establish_connection
 
     if success
       puts "Database restored successfully."
+      DbBackupHelpers.migrate_restored_database!
       DbBackupHelpers.reset_user_passwords!
       DbBackupHelpers.create_test_agents!
     else
@@ -206,25 +260,47 @@ namespace :db_backup do
     end
   end
 
+  task ensure_agent_restore_ready: :environment do
+    Backup::AgentResticRestore.ensure_docker_available! if Rails.env.development?
+  end
+
   desc "Download and restore the latest backup (full refresh)"
-  task refresh: [ :download, :restore ] do
+  task refresh: [ :ensure_agent_restore_ready, :download, :restore ] do
     DbBackupHelpers.ensure_not_production!
+    Rake::Task["db_backup:restore_agents"].invoke if Rails.env.development?
     puts "Database refresh completed."
   end
 
-  desc "Trigger a database backup on production via Kamal"
+  desc "Trigger a database and hosted Chaos-agent backup on production via Kamal"
   task :perform do
-    puts "Triggering database backup on production..."
-    system('kamal app exec -r web "bin/rails runner \'DatabaseBackupJob.perform_now\'"')
+    puts "Triggering database and hosted Chaos-agent backup on production..."
+    success = system('kamal app exec -r web "bin/rails runner \'FullBackupJob.perform_now(fail_fast: true)\'"')
+    abort "Production backup failed." unless success
   end
 
-  desc "Create test agents in the Nexus account"
+  desc "Restore hosted Chaos-agent volumes from the snapshots recorded in the restored database"
+  task restore_agents: :environment do
+    DbBackupHelpers.ensure_not_production!
+    abort "Agent restore is only supported in development." unless Rails.env.development?
+
+    unless DbBackupHelpers.refreshing?
+      puts "WARNING: This will replace local Docker volumes and containers for every restored hosted agent."
+      print "Continue restoring hosted agents? (y/N): "
+      response = $stdin.gets.chomp
+      abort "Aborted." unless response.downcase == "y"
+    end
+
+    Backup::AgentResticRestore.restore_all!
+    puts "Hosted Chaos agents restored."
+  end
+
+  desc "Create Chaos-backed test agents in the Nexus account"
   task create_test_agents: :environment do
     DbBackupHelpers.ensure_not_production!
     DbBackupHelpers.create_test_agents!
   end
 
-  desc "Create test agents in the Nexus account"
+  desc "Create Chaos-backed test agents in the Nexus account"
   task test_agents: :environment do
     DbBackupHelpers.ensure_not_production!
     DbBackupHelpers.create_test_agents!

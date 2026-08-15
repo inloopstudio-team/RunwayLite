@@ -11,22 +11,33 @@
     Gear,
     Check,
     Plus,
-    Heartbeat,
-    GithubLogo,
-    XLogo,
     Plugs,
     Key,
+    CurrencyDollar,
+    Chalkboard,
+    Megaphone,
   } from 'phosphor-svelte';
   import * as DropdownMenu from '$lib/components/shadcn/dropdown-menu/index.js';
   import { buttonVariants } from '$lib/components/shadcn/button/index.js';
   import { cn } from '$lib/utils.js';
-  import { editUserPath, editUserPasswordPath, accountPath, newAccountPath, apiKeysPath } from '@/routes';
+  import {
+    editUserPath,
+    editUserPasswordPath,
+    accountPath,
+    accountAgentApiKeysPath,
+    accountApiKeysPath,
+    accountCostsPath,
+    accountNoticesPath,
+    newAccountPath,
+    accountWhiteboardsPath,
+  } from '@/routes';
   import Avatar from '$lib/components/Avatar.svelte';
 
   let {
     currentUser,
     currentAccount = null,
     accounts = [],
+    hasWhiteboards = false,
     currentTheme = 'system',
     onThemeChange = () => {},
     onLogout = () => {},
@@ -35,6 +46,7 @@
 
 <DropdownMenu.Root>
   <DropdownMenu.Trigger
+    aria-label="User account menu"
     class={cn(buttonVariants({ variant: 'outline' }), 'rounded-full pl-0.5 pr-0.5 md:pr-2.5 gap-1 h-9')}>
     <Avatar user={currentUser} size="small" class="!size-8" />
     {#if currentUser?.full_name}
@@ -96,27 +108,39 @@
         <UserCircle class="mr-2 size-4" />
         <span>User Settings</span>
       </DropdownMenu.Item>
-      <DropdownMenu.Sub>
-        <DropdownMenu.SubTrigger>
-          <Plugs class="mr-2 size-4" />
-          <span>Integrations</span>
-        </DropdownMenu.SubTrigger>
-        <DropdownMenu.SubContent>
-          <DropdownMenu.Item onclick={() => router.visit('/oura_integration')}>
-            <Heartbeat class="mr-2 size-4" />
-            Oura Ring
-          </DropdownMenu.Item>
-          <DropdownMenu.Item onclick={() => router.visit('/github_integration')}>
-            <GithubLogo class="mr-2 size-4" />
-            GitHub
-          </DropdownMenu.Item>
-          <DropdownMenu.Item onclick={() => router.visit('/x_integration')}>
-            <XLogo class="mr-2 size-4" />
-            X / Twitter
-          </DropdownMenu.Item>
-        </DropdownMenu.SubContent>
-      </DropdownMenu.Sub>
       {#if currentAccount?.id}
+        <DropdownMenu.Item onclick={() => router.visit(`/accounts/${currentAccount.id}/personal_services`)}>
+          <Plugs class="mr-2 size-4" />
+          <span>Personal Services</span>
+        </DropdownMenu.Item>
+      {/if}
+      {#if currentAccount?.id}
+        {#if hasWhiteboards}
+          <DropdownMenu.Item onclick={() => router.visit(accountWhiteboardsPath(currentAccount.id))}>
+            <Chalkboard class="mr-2 size-4" />
+            <span>Whiteboards</span>
+          </DropdownMenu.Item>
+        {/if}
+        <DropdownMenu.Item onclick={() => router.visit(accountCostsPath(currentAccount.id))}>
+          <CurrencyDollar class="mr-2 size-4" />
+          <span>Costs</span>
+        </DropdownMenu.Item>
+        <DropdownMenu.Item onclick={() => router.visit(accountNoticesPath(currentAccount.id))}>
+          <Megaphone class="mr-2 size-4" />
+          <span>Resident Notices</span>
+        </DropdownMenu.Item>
+        <DropdownMenu.Item onclick={() => router.visit(accountAgentApiKeysPath(currentAccount.id))}>
+          <Key class="mr-2 size-4" />
+          <span>Resident API Keys</span>
+        </DropdownMenu.Item>
+        <DropdownMenu.Item onclick={() => router.visit(accountApiKeysPath(currentAccount.id))}>
+          <Plugs class="mr-2 size-4" />
+          <span>External Access</span>
+        </DropdownMenu.Item>
+        <DropdownMenu.Item onclick={() => router.visit(`/accounts/${currentAccount.id}/services`)}>
+          <Plugs class="mr-2 size-4" />
+          <span>Account Services</span>
+        </DropdownMenu.Item>
         <DropdownMenu.Item onclick={() => router.visit(accountPath(currentAccount.id))}>
           <Gear class="mr-2 size-4" />
           <span>Account Settings</span>
@@ -125,10 +149,6 @@
       <DropdownMenu.Item onclick={() => router.visit(newAccountPath())}>
         <Plus class="mr-2 size-4" />
         <span>New Account</span>
-      </DropdownMenu.Item>
-      <DropdownMenu.Item onclick={() => router.visit(apiKeysPath())}>
-        <Key class="mr-2 size-4" />
-        <span>API Keys</span>
       </DropdownMenu.Item>
       <DropdownMenu.Item onclick={() => router.visit(editUserPasswordPath())}>
         <Password class="mr-2 size-4" />

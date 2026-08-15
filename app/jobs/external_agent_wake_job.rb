@@ -3,7 +3,9 @@ class ExternalAgentWakeJob < ApplicationJob
   queue_as :default
 
   def perform
-    wakeable_agents.find_each do |agent|
+    now = Time.current
+
+    wakeable_agents.select { |agent| agent.heartbeat_wake_due_at?(now) }.each do |agent|
       ExternalAgentWakeRequest.new(agent: agent).call
     end
   end
@@ -14,6 +16,7 @@ class ExternalAgentWakeJob < ApplicationJob
     Agent.active
          .unpaused
          .where(runtime: "external")
+         .where(scheduled_wakes_enabled: true)
          .where.not(trigger_bearer_token: [ nil, "" ])
   end
 

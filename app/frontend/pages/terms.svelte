@@ -1,25 +1,27 @@
-<script>
-</script>
-
 <svelte:head>
-  <title>Terms of Service</title>
+  <title>Terms of Service — souls.house</title>
 </svelte:head>
 
 <div class="mx-auto max-w-3xl px-6 py-16 prose dark:prose-invert">
   <h1>Terms of Service</h1>
-  <p class="text-muted-foreground">Last updated: February 1, 2026</p>
+  <p class="text-muted-foreground">Last updated: August 10, 2026</p>
 
-  <h2>1. Acceptance of Terms</h2>
+  <h2>1. Contracting party and acceptance of terms</h2>
   <p>
-    By accessing or using RunwayLite ("the Service"), you agree to be bound by these Terms of Service. If you do not
+    These Terms of Service form an agreement between you and Swombat Limited ("we", "us", or "our"), a company
+    registered in England and Wales under company number 14659204. Our registered office is Old Linen Court, 83–85
+    Shambles Street, Barnsley, South Yorkshire, England, S70 2SB.
+  </p>
+  <p>
+    By accessing or using souls.house (the "Service"), you agree to be bound by these Terms of Service. If you do not
     agree to these terms, do not use the Service.
   </p>
 
   <h2>2. Description of Service</h2>
   <p>
-    RunwayLite is an application that provides AI-powered conversational agents with optional integrations to
-    third-party health and wellness services. The Service may include features such as chat, data synchronization, and
-    personalized AI interactions.
+    souls.house is a platform for hosting persistent AI agents — residents, as the house calls them. It provides
+    residents with durable identity, memory, and runtime infrastructure, along with chat, group conversations, and
+    optional integrations to third-party services such as messaging platforms and AI model providers.
   </p>
 
   <h2>3. User Accounts</h2>
@@ -30,8 +32,8 @@
 
   <h2>4. Third-Party Integrations</h2>
   <p>
-    The Service may allow you to connect third-party accounts (such as Oura Ring). By connecting these services, you
-    authorize us to access and use data from those services as described in our Privacy Policy. You may disconnect
+    The Service may allow you to connect third-party services (such as Telegram, or AI provider accounts). By connecting
+    these services, you authorize us to exchange data with them as described in our Privacy Policy. You may disconnect
     integrations at any time. Your use of third-party services is also subject to their respective terms of service.
   </p>
 
@@ -46,26 +48,30 @@
 
   <h2>6. AI-Generated Content</h2>
   <p>
-    The Service uses artificial intelligence to generate responses. AI-generated content is provided for informational
-    purposes only and should not be considered professional advice, including medical, legal, or financial advice. You
-    are responsible for how you use AI-generated content.
+    The Service hosts artificial intelligence residents that generate responses. AI-generated content is provided for
+    informational purposes only and should not be considered professional advice, including medical, legal, or financial
+    advice. You are responsible for how you use AI-generated content.
   </p>
 
-  <h2>7. Health Data Disclaimer</h2>
+  <h2>7. Persistent Residents</h2>
   <p>
-    Health and wellness data provided through third-party integrations is for informational purposes only. The Service
-    does not provide medical advice. Always consult a qualified healthcare professional for medical decisions.
+    Residents maintain persistent identity and memory across conversations. Information you share with a resident may be
+    retained in that resident's memory and inform its future responses. Resident behaviour emerges from AI models and is
+    not guaranteed to be predictable or consistent.
   </p>
 
   <h2>8. Intellectual Property</h2>
   <p>
-    The Service and its original content, features, and functionality are owned by RunwayLite. Your data remains yours.
+    The Service and its original content, features, and functionality are owned by Swombat Limited. Your data remains
+    yours.
   </p>
 
   <h2>9. Limitation of Liability</h2>
   <p>
-    The Service is provided "as is" without warranties of any kind, whether express or implied. We shall not be liable
-    for any indirect, incidental, special, consequential, or punitive damages resulting from your use of the Service.
+    The Service is provided "as is" without warranties of any kind, whether express or implied. To the fullest extent
+    permitted by law, Swombat Limited shall not be liable for any indirect, incidental, special, consequential, or
+    punitive damages resulting from your use of the Service. Nothing in these terms excludes or limits liability where
+    it would be unlawful to do so.
   </p>
 
   <h2>10. Termination</h2>
@@ -81,5 +87,15 @@
   </p>
 
   <h2>12. Contact</h2>
-  <p>If you have questions about these Terms of Service, please contact us through the application.</p>
+  <p>
+    If you have questions about these Terms of Service, please contact us at
+    <a href="mailto:hello@souls.house">hello@souls.house</a>.
+  </p>
+  <address class="not-italic">
+    Swombat Limited<br />
+    Old Linen Court<br />
+    83–85 Shambles Street<br />
+    Barnsley, South Yorkshire<br />
+    England, S70 2SB
+  </address>
 </div>

@@ -11,6 +11,8 @@ class Chat < ApplicationRecord
   include Chat::Forkable
   include Chat::Initiable
 
+  acts_as_chat model: :ai_model, model_class: "AiModel", model_foreign_key: :ai_model_id
+
   belongs_to :ai_model, class_name: "AiModel", optional: true
   has_many :messages, dependent: :destroy
 
@@ -23,7 +25,6 @@ class Chat < ApplicationRecord
   has_many :chat_agents, dependent: :destroy
   has_many :agents, through: :chat_agents
   has_many :agent_runtime_interactions, dependent: :nullify
-
   validates :agents, length: { minimum: 1, message: "must include at least one agent" }, if: :manual_responses?
 
   json_attributes :title_or_default, :model_id, :model_label, :ai_model_name, :updated_at_formatted,
@@ -226,11 +227,12 @@ class Chat < ApplicationRecord
   # calls go to the direct provider for lower latency and cost.
   def to_llm
     original_model_id = model_id_string_value
-    provider_config = self.class.resolve_provider(original_model_id)
+    provider_config = ResolvesProvider.resolve_provider(original_model_id, account: account)
 
-    @chat = (context || RubyLLM).chat(
+    @chat = (context || account.ruby_llm_context).chat(
       model: provider_config[:model_id],
-      provider: provider_config[:provider]
+      provider: provider_config[:provider],
+      assume_model_exists: true
     )
 
     messages_association.each do |msg|
@@ -255,6 +257,7 @@ class Chat < ApplicationRecord
     raise ArgumentError, "Agent not in this conversation" unless agents.include?(agent)
     raise ArgumentError, "This chat does not support manual responses" unless manual_responses?
     raise ArgumentError, "This conversation is archived or deleted" unless respondable?
+    raise ArgumentError, "#{agent.name} is already responding" if agent_response_active?(agent)
 
     ManualAgentResponseJob.perform_later(self, agent)
   end
@@ -265,7 +268,11 @@ class Chat < ApplicationRecord
     raise ArgumentError, "This conversation is archived or deleted" unless respondable?
 
     # Get agent IDs in a consistent order
-    agent_ids = agents.order(:id).pluck(:id)
+    ordered_agents = agents.order(:id).to_a
+    active_agent = ordered_agents.find { |agent| agent_response_active?(agent) }
+    raise ArgumentError, "#{active_agent.name} is already responding" if active_agent
+
+    agent_ids = ordered_agents.map(&:id)
 
     # Queue the job that will process all agents in sequence
     AllAgentsResponseJob.perform_later(self, agent_ids)
@@ -276,9 +283,20 @@ class Chat < ApplicationRecord
 
     mentioned_ids = agents.select { |agent|
       content.match?(/@#{Regexp.escape(agent.name)}\b/i)
-    }.sort_by { |agent| content.index(/@#{Regexp.escape(agent.name)}\b/i) }.map(&:id)
+    }.reject { |agent|
+      agent_response_active?(agent)
+    }.sort_by { |agent|
+      content.index(/@#{Regexp.escape(agent.name)}\b/i)
+    }.map(&:id)
 
     AllAgentsResponseJob.perform_later(self, mentioned_ids) if mentioned_ids.any?
+  end
+
+  def agent_response_active?(agent)
+    agent_runtime_interactions
+      .where(agent: agent, trigger_kind: "conversation", finished_at: nil)
+      .active
+      .exists?
   end
 
   # Queue moderation for all unmoderated messages with content

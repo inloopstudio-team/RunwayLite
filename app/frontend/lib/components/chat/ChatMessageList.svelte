@@ -18,6 +18,7 @@
     allMessages = [],
     chat = null,
     showAllMessages = false,
+    showMessageTelemetry = false,
     lastMessageIsHiddenThinking = false,
     shouldShowSendingPlaceholder = false,
     isTimedOut = false,
@@ -108,6 +109,7 @@
           {message}
           isLastVisible={index === timelineItems.length - 1}
           isGroupChat={chat?.manual_responses}
+          {showMessageTelemetry}
           showResend={index === timelineItems.length - 1 &&
             lastUserMessageNeedsResend &&
             !waitingForResponse &&
@@ -121,7 +123,7 @@
           onresend={resendLastMessage}
           onimagelightbox={openImageLightbox}
           onvoice={requestVoice} />
-      {:else}
+      {:else if item.type === 'runtime_interaction'}
         <AgentRuntimeActivityCard interaction={item.interaction} />
       {/if}
     {/each}
@@ -175,7 +177,7 @@
         <div class="max-w-[85%] md:max-w-[70%]">
           <Card.Root class="border-dashed border-2 border-muted-foreground/30 bg-muted/20">
             <Card.Content class="p-4">
-              <div class="text-muted-foreground text-sm">Please select an agent to respond</div>
+              <div class="text-muted-foreground text-sm">Please select a resident to respond</div>
             </Card.Content>
           </Card.Root>
         </div>

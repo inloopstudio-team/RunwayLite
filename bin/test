@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Run the test suite with libSQL-safe settings.
+#
+# Usage:
+#   bin/test                          # run all tests
+#   bin/test test/models/chat_test.rb # run a specific file
+#   bin/test test/models/ -n /chat/   # pass any rails test args through
+
+set -euo pipefail
+
+export RAILS_ENV=test
+export PARALLEL_WORKERS=1
+export RUST_LOG=warn
+
+echo "==> Dropping test databases..."
+rm -f storage/test.sqlite3 storage/test_cache.sqlite3 storage/test_queue.sqlite3 storage/test_cable.sqlite3 storage/fosm_test.sqlite3
+
+echo "==> Preparing test database..."
+bundle exec rails db:test:prepare
+
+echo "==> Running FOSM migrations..."
+bundle exec rails db:migrate:fosm
+
+echo "==> Running test suite..."
+exec bundle exec rails test "$@"

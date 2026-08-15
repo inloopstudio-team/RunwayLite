@@ -1,11 +1,11 @@
 class UpgradeConversationReplay < ActiveRecord::Migration[8.1]
 
   def up
-    add_column :messages,   :replay_payload,        :json
+    add_column :messages,   :replay_payload,        :text
     add_column :messages,   :cached_tokens,         :integer
     add_column :messages,   :cache_creation_tokens, :integer
     add_column :messages,   :reasoning_skip_reason, :string
-    add_column :tool_calls, :replay_payload,        :json
+    add_column :tool_calls, :replay_payload,        :text
 
     add_index :messages, :reasoning_skip_reason, where: "reasoning_skip_reason IS NOT NULL"
 

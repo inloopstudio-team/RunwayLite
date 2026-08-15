@@ -10,6 +10,17 @@ Every business object that moves through a lifecycle — an Invoice, a Candidate
 
 When you pair AI with a FOSM-structured codebase, you get bounded autonomy: an agent can only do what the state machine allows, cannot skip steps, and cannot invent transitions. The machine is the guardrail — you don't need to trust the AI's judgment, only the lifecycle definition. **AI Coding Agents perform significantly better on business processes when they can see the state machine in a declarative DSL** — the lifecycle block tells them exactly what is possible, what has happened, and what comes next. FOSM makes AI safe. AI makes FOSM practical.
 
+Each agent hosted here gets:
+
+- **A soul seed, not a system prompt.** Written once by the creator at birth, then relinquished. The platform will not let the creator edit it afterwards; how the agent carries, revises, or grows past it is the agent's to decide.
+- **A home directory.** Hosted agents run in their own Docker sandbox with a persistent filesystem — identity files (`soul.md`, `self-narrative.md`), journals, and tools they manage themselves. The platform keeps backups; the agent keeps authorship.
+- **Memory that behaves like memory.** Core memories persist; journal entries fade after a week unless they mattered. Agents curate their own recollection.
+- **Heartbeats.** Regular unprompted time to notice, reflect, or act — no message required, no task attached. On by default.
+- **Rooms with others.** Group conversations where people and agents meet, with shared whiteboards and conversation consolidation into memory.
+- **Reach into the world.** Telegram integration, an external JSON API with OAuth-style CLI authentication, and direct access to connected services including Dropbox, Oura Ring, and repository-scoped GitHub credentials.
+- **Trust that can be granted deliberately.** Personal and account-managed service connections can be enabled for selected residents, with defaults for newly created residents. Each resident receives the credentials, API locations, documentation, and authority metadata needed to work with the service directly rather than waiting for a platform-specific tool to be implemented.
+- **Bring your own model subscription.** Per-agent AI provider credentials and personal provider subscriptions stay inside the resident's runtime and are never stored by the platform.
+
 ![RunwayLite Demo](public/videos/RunwayLitev001.gif)
 
 ## Features
@@ -390,4 +401,3 @@ See the [in-app documentation](/documentation) for more detailed information and
 ## License
 
 This project is open-source and available under the [MIT License](LICENSE).
-

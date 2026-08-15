@@ -89,23 +89,147 @@ class ProcessTelegramUpdateJobTest < ActiveSupport::TestCase
   end
 
   test "ignores non-start messages" do
-    assert_no_difference "TelegramSubscription.count" do
+    assert_no_difference [ "TelegramSubscription.count", "TelegramMessage.count" ] do
       ProcessTelegramUpdateJob.perform_now(@agent, build_update("hello"))
+    end
+  end
+
+  test "stores a direct message from a subscribed user" do
+    subscription = @agent.telegram_subscriptions.create!(user: @user, telegram_chat_id: 456)
+
+    assert_difference "TelegramMessage.count", 1 do
+      assert_no_enqueued_jobs only: TelegramAgentTriggerJob do
+        ProcessTelegramUpdateJob.perform_now(@agent, build_update("hello", username: "daniel_t"))
+      end
+    end
+
+    telegram_message = subscription.telegram_messages.last
+    assert_equal "user", telegram_message.role
+    assert_equal "hello", telegram_message.text
+    assert_equal "daniel_t", telegram_message.sender_username
+    assert_equal "daniel_t", subscription.reload.telegram_username
+  end
+
+  test "triggers an external agent for a subscribed direct message" do
+    @agent.update!(
+      runtime: "external",
+      endpoint_url: "https://agent.example.com",
+      trigger_bearer_token: "tr_valid"
+    )
+    @agent.telegram_subscriptions.create!(user: @user, telegram_chat_id: 456)
+
+    assert_enqueued_with(job: TelegramAgentTriggerJob) do
+      ProcessTelegramUpdateJob.perform_now(@agent, build_update("wake up"))
+    end
+  end
+
+  test "does not trigger twice for a duplicate Telegram update" do
+    @agent.update!(
+      runtime: "external",
+      endpoint_url: "https://agent.example.com",
+      trigger_bearer_token: "tr_valid"
+    )
+    @agent.telegram_subscriptions.create!(user: @user, telegram_chat_id: 456)
+    update = build_update("once")
+
+    assert_difference "TelegramMessage.count", 1 do
+      2.times { ProcessTelegramUpdateJob.perform_now(@agent, update) }
+    end
+    assert_equal 1, enqueued_jobs.count { |job| job["job_class"] == "TelegramAgentTriggerJob" }
+  end
+
+  test "stores a pending photo and enqueues preparation" do
+    subscription = @agent.telegram_subscriptions.create!(user: @user, telegram_chat_id: 456)
+    update = build_media_update(
+      "photo" => [
+        { "file_id" => "small", "file_size" => 100, "width" => 100, "height" => 100 },
+        { "file_id" => "large", "file_size" => 200, "width" => 800, "height" => 600 }
+      ],
+      "caption" => "Look at this"
+    )
+
+    assert_enqueued_with(job: PrepareTelegramMediaJob) do
+      ProcessTelegramUpdateJob.perform_now(@agent, update)
+    end
+
+    message = subscription.telegram_messages.last
+    assert_equal "photo", message.media_kind
+    assert_equal "pending", message.media_status
+    assert_equal "Look at this", message.caption
+    assert_equal "Look at this\n\n[Photo — processing]", message.text
+    assert_equal({ "width" => 800, "height" => 600 }, message.media_metadata)
+    assert_equal "large", enqueued_jobs.last.fetch("arguments").second
+  end
+
+  test "stores voice captions and enqueues preparation" do
+    subscription = @agent.telegram_subscriptions.create!(user: @user, telegram_chat_id: 456)
+    update = build_media_update(
+      "voice" => { "file_id" => "voice-1", "file_size" => 10_000, "duration" => 8 },
+      "caption" => "A quick thought"
+    )
+
+    assert_enqueued_with(job: PrepareTelegramMediaJob) do
+      ProcessTelegramUpdateJob.perform_now(@agent, update)
+    end
+
+    message = subscription.telegram_messages.last
+    assert_equal "voice", message.media_kind
+    assert_equal "A quick thought\n\n[Voice message — processing]", message.text
+    assert_equal 8, message.media_metadata["duration"]
+  end
+
+  test "rejects oversized video before preparation" do
+    subscription = @agent.telegram_subscriptions.create!(user: @user, telegram_chat_id: 456)
+    update = build_media_update(
+      "video" => {
+        "file_id" => "too-large",
+        "file_size" => TelegramMessage.media_limit_for("video") + 1,
+        "duration" => 30,
+        "width" => 1920,
+        "height" => 1080
+      }
+    )
+
+    Net::HTTP.stub :post, @fake_ok do
+      assert_no_enqueued_jobs only: PrepareTelegramMediaJob do
+        ProcessTelegramUpdateJob.perform_now(@agent, update)
+      end
+    end
+
+    message = subscription.telegram_messages.last
+    assert_equal "failed", message.media_status
+    assert_equal "too_large", message.media_error
+    assert_equal "[Video could not be received]", message.text
+  end
+
+  test "ignores unsupported media" do
+    @agent.telegram_subscriptions.create!(user: @user, telegram_chat_id: 456)
+
+    assert_no_difference "TelegramMessage.count" do
+      ProcessTelegramUpdateJob.perform_now(@agent, build_media_update("document" => { "file_id" => "doc" }))
     end
   end
 
   private
 
-  def build_update(text)
+  def build_update(text, username: nil)
     {
       "update_id" => 123,
       "message" => {
         "message_id" => 1,
-        "chat" => { "id" => 456 },
+        "date" => Time.current.to_i,
+        "chat" => { "id" => 456, "type" => "private" },
         "text" => text,
-        "from" => { "id" => 789 }
+        "from" => { "id" => 789, "username" => username }
       }
     }
+  end
+
+  def build_media_update(payload)
+    build_update(nil).tap do |update|
+      update.fetch("message").delete("text")
+      update.fetch("message").merge!(payload)
+    end
   end
 
 end

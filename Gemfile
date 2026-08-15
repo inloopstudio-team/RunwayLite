@@ -54,6 +54,8 @@ group :development, :test do
   # For testing external API calls
   gem "vcr"
   gem "webmock"
+  # Ruby 4 removed CGI.parse from core; vcr 6.3 still calls it
+  gem "cgi"
 end
 
 group :development do
@@ -80,8 +82,8 @@ gem "hashids"
 
 gem "ruby-openai"
 
-# Ruby LLM - AI framework with extended thinking support (v1.10+) and xAI/Grok (v1.11+)
-gem "ruby_llm", github: "crmne/ruby_llm", branch: "main"
+# Ruby LLM - pin stable releases so provider and instrumentation behaviour is reproducible.
+gem "ruby_llm", "~> 1.16.0"
 
 gem "pagy", "~> 9.3"
 
@@ -98,7 +100,7 @@ gem "discard", "~> 1.3"
 gem "x"
 
 # Finite Object State Machine — declarative lifecycles for business objects
-gem "fosm-rails", github: "inloopstudio/fosm-rails"
+gem "fosm-rails"
 
 # Turso/libSQL adapter for FOSM database
 gem "libsql_activerecord"

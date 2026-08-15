@@ -6,7 +6,15 @@
   import { agentIconFor } from '$lib/agent-icons';
   import { onDestroy } from 'svelte';
 
-  let { agents = [], accountId, chatId, disabled = false, responseMarker = null, onTrigger = null } = $props();
+  let {
+    agents = [],
+    accountId,
+    chatId,
+    disabled = false,
+    activeRuntimeAgentIds = [],
+    responseMarker = null,
+    onTrigger = null,
+  } = $props();
   let triggeringAgent = $state(null);
   let triggeringAll = $state(false);
   let waitingForResponse = $state(false);
@@ -88,6 +96,8 @@
   }
 
   const isTriggering = $derived(triggeringAgent !== null || triggeringAll || waitingForResponse);
+  const activeAgentIds = $derived(new Set(activeRuntimeAgentIds));
+  const anyAgentActive = $derived(activeRuntimeAgentIds.length > 0);
 
   onDestroy(() => {
     if (timeoutId) clearTimeout(timeoutId);
@@ -97,19 +107,19 @@
 {#if agents.length > 0}
   <div class="border-t border-border px-3 md:px-6 py-3 bg-muted/20">
     <div class="flex items-center gap-2 flex-wrap">
-      <span class="text-xs text-muted-foreground mr-2 hidden md:inline">Ask agent:</span>
+      <span class="text-xs text-muted-foreground mr-2 hidden md:inline">Ask resident:</span>
       {#each agents as agent (agent.id)}
         {@const IconComponent = agentIconFor(agent.icon)}
         <Button
           variant="outline"
           size="sm"
           onclick={() => triggerAgent(agent)}
-          disabled={disabled || isTriggering}
+          disabled={disabled || isTriggering || activeAgentIds.has(agent.id)}
           class="gap-2 {agent.colour
             ? `border-${agent.colour}-300 dark:border-${agent.colour}-700 hover:bg-${agent.colour}-50 dark:hover:bg-${agent.colour}-950`
             : ''}"
-          title={agent.name}>
-          {#if triggeringAgent === agent.id}
+          title={activeAgentIds.has(agent.id) ? `${agent.name} is already running` : agent.name}>
+          {#if triggeringAgent === agent.id || activeAgentIds.has(agent.id)}
             <Spinner size={14} class="animate-spin" />
           {:else}
             <IconComponent
@@ -125,9 +135,9 @@
           variant="default"
           size="sm"
           onclick={triggerAllAgents}
-          disabled={disabled || isTriggering}
+          disabled={disabled || isTriggering || anyAgentActive}
           class="gap-2 ml-2"
-          title="Ask All Agents">
+          title="Ask All Residents">
           {#if triggeringAll}
             <Spinner size={14} class="animate-spin" />
           {:else}

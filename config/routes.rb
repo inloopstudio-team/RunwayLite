@@ -4,6 +4,8 @@ Rails.application.routes.draw do
     namespace :test_support, path: "test" do
       namespace :e2e do
         post :setup, to: "/test_support/e2e#setup"
+        post :conversation_fixture, to: "/test_support/e2e#conversation_fixture"
+        post :append_messages, to: "/test_support/e2e#append_messages"
         post :assistant_message, to: "/test_support/e2e#assistant_message"
         post :invitation_url, to: "/test_support/e2e#invitation_url"
         post :perform_promote, to: "/test_support/e2e#perform_promote"
@@ -20,9 +22,6 @@ Rails.application.routes.draw do
   get "favicon.:format", to: "favicon#show", as: :favicon, defaults: { format: "ico" }
   get "favicon", to: "favicon#show", defaults: { format: "ico" }
   get "apple-touch-icon.png", to: "favicon#apple_touch_icon"
-
-  # Documentation
-  get "documentation" => "documentation#index", as: :documentation
 
   get "login" => "sessions#new", as: :login
   post "login" => "sessions#create"
@@ -44,8 +43,9 @@ Rails.application.routes.draw do
     end
   end
 
-  # API Key Management (browser-based)
-  resources :api_keys, only: [ :index, :create, :destroy ]
+  # Legacy entry point for browser-managed external access keys.
+  # The controller redirects this to the user's default account.
+  get "api_keys", to: "api_keys#index", as: :api_keys
 
   # API Key Approvals (all actions keyed by token)
   get    "api_keys/approvals/:token", to: "api_key_approvals#show",    as: :api_key_approval
@@ -64,6 +64,14 @@ Rails.application.routes.draw do
     end
 
     resource :agent_initiation, only: :create, module: :accounts
+    resource :agent_api_keys, only: [ :show, :update ], module: :accounts
+    resource :costs, only: :show, module: :accounts
+    resources :notices, only: [ :index, :create, :destroy ], module: :accounts
+    resources :api_keys, path: "external_access", only: [ :index, :create, :destroy ]
+    resources :services, only: :index, module: :accounts
+    resource :personal_services, only: :show, module: :accounts
+    resources :service_authorizations, only: :create
+    resources :service_connections, only: [ :create, :update, :destroy ], module: :accounts
 
     resources :chats do
       collection do
@@ -82,8 +90,9 @@ Rails.application.routes.draw do
       resources :messages, only: [ :index, :create ]
     end
 
-    resources :agents, except: [ :show, :new ] do
+    resources :agents, except: :show do
       member do
+        get :onboarding, to: "agents/onboarding#show"
         get :promote, to: "agents/promote#show"
         post "promote/github_access", to: "agents/promote#github_access", as: :github_access_promote
         post "promote/begin", to: "agents/promote#begin", as: :begin_promote
@@ -96,6 +105,8 @@ Rails.application.routes.draw do
       end
 
       scope module: :agents do
+        resource :provisioning_retry, only: :create
+        resource :orientation_retry, only: :create
         resource :hosting_diagnostics, only: :show do
           get :file_preview
         end
@@ -104,6 +115,11 @@ Rails.application.routes.draw do
         resource :telegram_test, only: :create
         resource :telegram_webhook, only: :create
         resource :predecessor, only: :create
+        resource :provider_subscription, only: [ :show, :create, :update, :destroy ] do
+          post :cancel
+          post :code
+        end
+        resources :service_accesses, only: :update
         resources :memories, only: [ :create ] do
           resource :discard, only: [ :create, :destroy ], module: :memories
           resource :protection, only: [ :create, :destroy ], module: :memories
@@ -124,16 +140,21 @@ Rails.application.routes.draw do
   end
 
   namespace :admin do
+    resources :agents, only: [] do
+      resource :runtime, only: :show, controller: "agent_runtime_sessions"
+    end
     resources :accounts, only: [ :index ] do
       member do
         patch :disable
         patch :enable
         patch :convert
+        patch :shared_ai_credentials
       end
       resources :memberships, only: [ :create, :destroy ], controller: "account_memberships"
     end
     resources :audit_logs, only: [ :index ]
     resources :jobs, only: [ :index, :create ]
+    resources :notices, only: [ :index, :create, :destroy ]
     resource :settings, only: [ :show, :update ]
   end
 
@@ -144,21 +165,31 @@ Rails.application.routes.draw do
       post "agents/:uuid/announce", to: "agents#announce", as: :agent_announce
       get "agents/:uuid/health", to: "agents#health", as: :agent_health
       resources :conversations, only: [ :index, :show, :create ] do
-        resources :messages, only: :create
+        resources :messages, only: :create do
+          resources :attachments, only: :show
+        end
         resource :agent_trigger, only: :create
         resources :participants, only: :create
       end
       resources :agents, only: [ :index, :show ]
+      resources :telegram_conversations, only: :show
+      get "telegram_conversations/:conversation_id/messages/:message_id/media",
+        to: "telegram_media#show",
+        as: :telegram_conversation_message_media
+      get "telegram_conversations/:conversation_id/messages/:message_id/preview_frames/:id",
+        to: "telegram_media#preview_frame",
+        as: :telegram_conversation_message_preview_frame
       resources :telegram_messages, only: :create
+      resources :telegram_subscribers, only: :index
+      resource :attention, only: :show
+      resources :service_connections, only: [] do
+        resource :access_token, only: :show, controller: "service_connection_tokens"
+      end
       resources :whiteboards, only: [ :index, :show, :create, :update ]
     end
   end
 
-  # Oura Ring integration (OAuth + settings)
-  resource :oura_integration, only: %i[show create update destroy], controller: "oura_integration" do
-    get :callback
-    post :sync
-  end
+  get "service_authorizations/callback", to: "service_authorizations#callback", as: :service_authorization_callback
 
   # GitHub integration (OAuth + repo selection + settings)
   resource :github_integration, only: %i[show create update destroy], controller: "github_integration" do

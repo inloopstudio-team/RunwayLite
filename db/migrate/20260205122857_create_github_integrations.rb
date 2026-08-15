@@ -6,7 +6,7 @@ class CreateGithubIntegrations < ActiveRecord::Migration[8.1]
       t.text :access_token
       t.string :github_username
       t.string :repository_full_name
-      t.jsonb :recent_commits, default: []
+      t.text :recent_commits, default: '[]'
       t.datetime :commits_synced_at
       t.boolean :enabled, default: true, null: false
       t.timestamps

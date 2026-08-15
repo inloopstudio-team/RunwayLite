@@ -1,4 +1,6 @@
 class Profile < ApplicationRecord
+  serialize :preferences, coder: JSON
+
 
   include JsonAttributes
 

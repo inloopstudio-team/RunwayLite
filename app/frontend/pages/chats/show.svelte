@@ -12,6 +12,7 @@
   import TelegramBanner from '$lib/components/chat/TelegramBanner.svelte';
   import DebugPanel from '$lib/components/chat/DebugPanel.svelte';
   import ChatOverlays from '$lib/components/chat/ChatOverlays.svelte';
+  import ConversationCostDrawer from '$lib/components/chat/ConversationCostDrawer.svelte';
   import {
     accountChatMessagesPath,
     messageRetryPath,
@@ -34,7 +35,12 @@
     timestampLabelForMessages,
     visibleChatMessages,
   } from '$lib/chat-message-state';
-  import { combinePaginatedMessages, prependOlderMessages, shouldLoadMoreMessages } from '$lib/chat-pagination-state';
+  import {
+    combinePaginatedMessages,
+    prependOlderMessages,
+    preserveDisplacedRecentMessages,
+    shouldLoadMoreMessages,
+  } from '$lib/chat-pagination-state';
   import {
     appendMessageIfMissing,
     patchMessageInCollections,
@@ -64,6 +70,7 @@
     chats = [],
     messages: recentMessages = [],
     runtime_interactions: runtimeInteractions = [],
+    cost_breakdown: costBreakdown = {},
     has_more_messages: serverHasMore = false,
     oldest_message_id: serverOldestId = null,
     account,
@@ -80,6 +87,8 @@
   let hasMore = $state(serverHasMore);
   let oldestId = $state(serverOldestId);
   let loadingMore = $state(false);
+  let previousRecentMessages = [];
+  let previousRecentChatId = null;
 
   const allMessages = $derived(combinePaginatedMessages(olderMessages, recentMessages));
 
@@ -105,6 +114,26 @@
     }
   });
 
+  // A sync reload always returns the newest 30 messages. Preserve records that
+  // were in the previous window but were pushed out by newly-arrived messages,
+  // otherwise a long open conversation develops gaps at the pagination seam.
+  $effect(() => {
+    const currentChatId = chat?.id ?? null;
+    const currentRecentMessages = recentMessages || [];
+
+    if (currentChatId !== previousRecentChatId) {
+      previousRecentChatId = currentChatId;
+      previousRecentMessages = currentRecentMessages;
+    } else {
+      olderMessages = preserveDisplacedRecentMessages({
+        olderMessages,
+        previousRecentMessages,
+        recentMessages: currentRecentMessages,
+      });
+      previousRecentMessages = currentRecentMessages;
+    }
+  });
+
   // Update pagination state when server props change, but only if we haven't paginated yet
   $effect(() => {
     if (olderMessages.length === 0) {
@@ -120,6 +149,9 @@
   let timeoutCheckInterval;
   let showAllMessages = $state(false);
   let debugMode = $state(false);
+  let showCosts = $state(false);
+  let showMessageTelemetry = $state(false);
+  let messageTelemetryChatId = chat?.id;
   let debugLogs = $state([]);
   // Brief "select an agent" prompt for group chats after sending a message
   let showAgentPrompt = $state(false);
@@ -142,6 +174,13 @@
 
   // Streaming safety-net refresh timer
   let streamingRefreshTimer = null;
+
+  $effect(() => {
+    if (chat?.id !== messageTelemetryChatId) {
+      messageTelemetryChatId = chat?.id;
+      showMessageTelemetry = false;
+    }
+  });
 
   function scheduleStreamingRefresh(delayMs = 5000) {
     if (streamingRefreshTimer) clearTimeout(streamingRefreshTimer);
@@ -317,6 +356,9 @@
 
   // Check if any agent is currently responding (streaming)
   const agentIsResponding = $derived(allMessages?.some((m) => m.streaming) ?? false);
+  const activeRuntimeAgentIds = $derived(
+    (runtimeInteractions || []).filter((interaction) => interaction.active).map((interaction) => interaction.agent_id)
+  );
   const latestAssistantMessageId = $derived.by(() => {
     const assistantMessage = [...(allMessages || [])].reverse().find((message) => message.role === 'assistant');
     return assistantMessage?.id ?? null;
@@ -610,11 +652,14 @@
       {allMessages}
       {contextTokens}
       {costTokens}
+      {costBreakdown}
       {thresholds}
       availableAgents={available_agents}
       addableAgents={addable_agents}
       bind:showAllMessages
       bind:debugMode
+      bind:showCosts
+      bind:showMessageTelemetry
       onsidebaropen={() => (sidebarOpen = true)}
       onassignagent={() => (assignAgentOpen = true)}
       onaddagent={() => (addAgentOpen = true)}
@@ -648,6 +693,7 @@
       {allMessages}
       {chat}
       {showAllMessages}
+      {showMessageTelemetry}
       {lastMessageIsHiddenThinking}
       {shouldShowSendingPlaceholder}
       {isTimedOut}
@@ -673,6 +719,7 @@
       {agents}
       accountId={account.id}
       {agentIsResponding}
+      {activeRuntimeAgentIds}
       {responseMarker}
       fileUploadConfig={file_upload_config}
       onAgentTrigger={scheduleStreamingRefresh}
@@ -701,6 +748,8 @@
       }} />
   </main>
 </div>
+
+<ConversationCostDrawer bind:open={showCosts} breakdown={costBreakdown} />
 
 <ChatOverlays
   {chat}

@@ -5,6 +5,7 @@ class AllAgentsResponseJob < ApplicationJob
   include StreamsAiResponse
   include SelectsLlmProvider
   include BroadcastsDebug
+  include ConfiguresLlmThinking
 
   retry_on RubyLLM::ModelNotFoundError, wait: 5.seconds, attempts: 2
   retry_on RubyLLM::BadRequestError, wait: :polynomially_longer, attempts: 3
@@ -39,10 +40,10 @@ class AllAgentsResponseJob < ApplicationJob
     @use_thinking = agent.uses_thinking? && Chat.supports_thinking?(agent.model_id)
     debug_info "Thinking: #{@use_thinking ? 'enabled' : 'disabled'}"
 
-    provider_config = llm_provider_for(agent.model_id, thinking_enabled: @use_thinking)
+    provider_config = llm_provider_for(agent.model_id, thinking_enabled: @use_thinking, account: chat.account)
     @provider = provider_config[:provider]
 
-    if @use_thinking && Chat.requires_direct_api_for_thinking?(agent.model_id) && !anthropic_api_available?
+    if @use_thinking && Chat.requires_direct_api_for_thinking?(agent.model_id) && !anthropic_api_available?(account: chat.account)
       record_thinking_skip!("anthropic_key_unavailable",
         content: "_Extended thinking requires Anthropic API access, but the API key is not configured. Configure ANTHROPIC_API_KEY to enable signed reasoning blocks._")
       enqueue_remaining_agents(chat, remaining_agent_ids)
@@ -52,11 +53,12 @@ class AllAgentsResponseJob < ApplicationJob
     @pending_skip_reason = "tool_continuity_missing" if @use_thinking && @provider == :gemini && missing_gemini_tool_continuity?(chat, agent)
 
     context = chat.build_context_for_agent(agent, thinking_enabled: @use_thinking, provider: @provider)
+    @prompt_layout_telemetry = chat.prompt_layout_telemetry
     debug_info "Built context with #{context.length} messages"
 
     debug_info "Using provider: #{provider_config[:provider]}, model: #{provider_config[:model_id]}"
 
-    llm = RubyLLM.chat(
+    llm = chat.account.ruby_llm_context.chat(
       model: provider_config[:model_id],
       provider: provider_config[:provider],
       assume_model_exists: true
@@ -73,9 +75,11 @@ class AllAgentsResponseJob < ApplicationJob
     tools_added = []
     agent.tools.each do |tool_class|
       tool = tool_class.new(chat: chat, current_agent: agent)
+      next if tool.respond_to?(:available?) && !tool.available?
       llm = llm.with_tool(tool)
       tools_added << tool_class.name
     end
+
     debug_info "Added #{tools_added.length} tools: #{tools_added.join(', ')}" if tools_added.any?
 
     if chat.audio_tools_available_for?(agent.model_id)
@@ -83,6 +87,8 @@ class AllAgentsResponseJob < ApplicationJob
       tools_added << "FetchAudioTool"
       debug_info "Added FetchAudioTool (model supports audio input, voice messages present)"
     end
+
+    llm = ensure_tool_compatible_thinking(llm, provider_config, tools_added)
 
     llm.on_new_message do
       if @ai_message
@@ -99,7 +105,8 @@ class AllAgentsResponseJob < ApplicationJob
         agent: agent,
         content: "",
         thinking: "",
-        streaming: true
+        streaming: true,
+        **@prompt_layout_telemetry
       )
       debug_info "Message created with ID: #{@ai_message.obfuscated_id}"
     end
@@ -181,51 +188,6 @@ class AllAgentsResponseJob < ApplicationJob
   end
 
   private
-
-  # Configures thinking on the LLM chat, with fallback for outdated model registry
-  def configure_thinking(llm, budget, provider)
-    # Anthropic requires max_tokens > budget_tokens, so we must set it explicitly
-    if provider == :anthropic
-      max_tokens = budget + 8000
-      llm.with_thinking(budget: budget).with_params(max_tokens: max_tokens)
-    else
-      llm.with_thinking(budget: budget)
-    end
-  rescue StandardError => e
-    raise unless unsupported_thinking_feature_error?(e)
-
-    # Model registry may be outdated - fall back to direct params for known providers
-    case provider
-    when :anthropic
-      max_tokens = budget + 8000
-      llm.with_params(
-        thinking: { type: "enabled", budget_tokens: budget },
-        max_tokens: max_tokens
-      )
-    when :openrouter, :openai, :xai
-      # OpenAI/xAI use reasoning effort levels (xAI Grok models support similar format)
-      effort = budget_to_effort(budget)
-      llm.with_params(
-        reasoning: { effort: effort, summary: "auto" },
-        max_completion_tokens: budget + 8000
-      )
-    else
-      raise # Re-raise for truly unsupported models
-    end
-  end
-
-  def unsupported_thinking_feature_error?(error)
-    error.class.name == "RubyLLM::UnsupportedFeatureError"
-  end
-
-  # Converts token budget to OpenAI reasoning effort level
-  def budget_to_effort(budget)
-    case budget
-    when 0..2000 then "low"
-    when 2001..15000 then "medium"
-    else "high"
-    end
-  end
 
   def record_thinking_skip!(reason, content:)
     debug_info "Recording reasoning skip: #{reason}"

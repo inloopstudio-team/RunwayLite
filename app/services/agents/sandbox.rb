@@ -1,4 +1,5 @@
 require "shellwords"
+require "tempfile"
 
 module Agents
   class Sandbox
@@ -6,6 +7,20 @@ module Agents
     class SandboxError < StandardError; end
 
     REPO_PATH = "/home/agent/repo"
+    WORK_PATH = "/home/agent/work"
+    STATE_PATH = "/home/agent/state"
+    CHAOS_BUILT_IN_PROVIDER_IDS = %w[anthropic openai xai].freeze
+    CHAOS_RUNTIME_PROVIDER_IDS = %w[gemini openrouter].freeze
+    SUPPORTED_CHAOS_PROVIDER_IDS = (
+      CHAOS_BUILT_IN_PROVIDER_IDS + CHAOS_RUNTIME_PROVIDER_IDS
+    ).freeze
+    CHAOS_PROVIDER_IDS = {
+      anthropic: "anthropic",
+      openai: "openai",
+      gemini: "gemini",
+      xai: "xai",
+      openrouter: "openrouter"
+    }.freeze
 
     attr_reader :agent
 
@@ -24,10 +39,11 @@ module Agents
       Agents::Volume.new(agent).ensure!
 
       if container_exists?
-        if container_image_current?
+        if container_current?
           start!
         else
           migrate_repo_volume_from_container!
+          migrate_work_volume_from_container!
           remove_container!
           run_container!
         end
@@ -40,8 +56,8 @@ module Agents
       agent.update!(runtime: "external", health_state: "healthy", consecutive_health_failures: 0)
     end
 
-    def stale_image?
-      container_exists? && !container_image_current?
+    def stale_container?
+      container_exists? && !container_current?
     end
 
     def active_turn?
@@ -53,12 +69,23 @@ module Agents
       false
     end
 
+    def with_runtime
+      return yield unless Agents::Config.cold_start?
+
+      spawn!
+      yield
+    ensure
+      stop_if_idle! if Agents::Config.cold_start?
+    end
+
     def recreate!
-      migrate_repo_volume_from_container! if container_exists?
+      if container_exists?
+        migrate_repo_volume_from_container!
+        migrate_work_volume_from_container!
+      end
       remove!(delete_volume: false)
       spawn!
     end
-
 
     def status
       @configuration_error = nil
@@ -71,11 +98,15 @@ module Agents
         volume_name: agent.uuid.present? ? Agents::Volume.new(agent).volume_name : nil,
         chaos_volume_name: agent.uuid.present? ? "chaos-home-#{agent.uuid}" : nil,
         repo_volume_name: agent.uuid.present? ? repo_volume_name : nil,
+        work_volume_name: agent.uuid.present? ? work_volume_name : nil,
+        state_volume_name: agent.uuid.present? ? state_volume_name : nil,
         docker_available: false,
         container_exists: false,
         identity_volume_exists: false,
         chaos_volume_exists: false,
-        repo_volume_exists: false
+        repo_volume_exists: false,
+        work_volume_exists: false,
+        state_volume_exists: false
       }
       base[:configuration_error] = @configuration_error if @configuration_error.present?
 
@@ -91,6 +122,8 @@ module Agents
       base[:identity_volume_exists] = volume_exists?(base[:volume_name])
       base[:chaos_volume_exists] = volume_exists?(base[:chaos_volume_name])
       base[:repo_volume_exists] = volume_exists?(base[:repo_volume_name])
+      base[:work_volume_exists] = volume_exists?(base[:work_volume_name])
+      base[:state_volume_exists] = volume_exists?(base[:state_volume_name])
       base[:image_present] = image_present?(agent.container_image)
 
       if agent.container_name.present?
@@ -101,13 +134,16 @@ module Agents
           network = container.fetch("NetworkSettings", {})
           configured_image_id = image_id(agent.container_image)
           container_image_current = configured_image_id.present? && container["Image"] == configured_image_id
+          container_configuration_current = container_configuration_current?(container)
           base.merge!(
             container_exists: true,
             container_id: container["Id"].to_s.first(12),
             container_image_id: container["Image"],
             configured_image_id: configured_image_id,
             container_image_current: container_image_current,
+            container_configuration_current: container_configuration_current,
             image_stale: !container_image_current,
+            container_stale: !container_image_current || !container_configuration_current,
             container_helixkit_app_url: container_env_value(container, "HELIXKIT_APP_URL"),
             container_state: state["Status"],
             container_running: state["Running"],
@@ -133,7 +169,25 @@ module Agents
     end
 
     def start!
+      update_restart_policy!
       system("docker", "start", agent.container_name, out: File::NULL, err: File::NULL) || raise(SandboxError, "failed to start #{agent.container_name}")
+    end
+
+    def running?
+      result = docker_capture("container", "inspect", "--format", "{{.State.Running}}", agent.container_name)
+      result[:ok] && result[:stdout].strip == "true"
+    end
+
+    def stopped?
+      container_exists? && !running?
+    end
+
+    def stop_if_idle!
+      return unless running?
+      return if active_turn?
+      return if AgentRuntimeInteraction.where(agent: agent).active.exists?
+
+      stop!
     end
 
     def remove!(delete_volume: false)
@@ -141,6 +195,8 @@ module Agents
       if delete_volume
         Agents::Volume.new(agent).destroy!
         destroy_repo_volume!
+        destroy_work_volume!
+        destroy_state_volume!
       end
     end
 
@@ -176,11 +232,15 @@ module Agents
         volume_name: nil,
         chaos_volume_name: nil,
         repo_volume_name: nil,
+        work_volume_name: nil,
+        state_volume_name: nil,
         docker_available: false,
         container_exists: false,
         identity_volume_exists: false,
         chaos_volume_exists: false,
-        repo_volume_exists: false
+        repo_volume_exists: false,
+        work_volume_exists: false,
+        state_volume_exists: false
       }
     end
 
@@ -218,14 +278,20 @@ module Agents
       system("docker", "container", "inspect", agent.container_name, out: File::NULL, err: File::NULL)
     end
 
-    def container_image_current?
+    def container_current?
       inspect = docker_capture("container", "inspect", agent.container_name)
       return false unless inspect[:ok]
 
       container = JSON.parse(inspect[:stdout]).first
-      image_current?(container["Image"], agent.container_image)
+      image_current?(container["Image"], agent.container_image) && container_configuration_current?(container)
     rescue StandardError
       false
+    end
+
+    def container_configuration_current?(container)
+      Array(container["Mounts"]).none? do |mount|
+        mount["Type"] == "bind" && mount["Destination"] == "/run/helixkit-source.yml"
+      end
     end
 
     def remove_container!
@@ -246,53 +312,141 @@ module Agents
       system("docker", "volume", "rm", "-f", repo_volume_name, out: File::NULL, err: File::NULL) if agent.uuid.present?
     end
 
+    def work_volume_name
+      "hk-agent-#{agent.uuid}-work"
+    end
+
+    def ensure_work_volume!
+      return true if volume_exists?(work_volume_name)
+
+      system("docker", "volume", "create", work_volume_name, out: File::NULL, err: File::NULL) || raise(SandboxError, "failed to create docker volume #{work_volume_name}")
+    end
+
+    def destroy_work_volume!
+      system("docker", "volume", "rm", "-f", work_volume_name, out: File::NULL, err: File::NULL) if agent.uuid.present?
+    end
+
+    def state_volume_name
+      "hk-agent-#{agent.uuid}-state"
+    end
+
+    def ensure_state_volume!
+      return true if volume_exists?(state_volume_name)
+
+      system("docker", "volume", "create", state_volume_name, out: File::NULL, err: File::NULL) || raise(SandboxError, "failed to create docker volume #{state_volume_name}")
+    end
+
+    def destroy_state_volume!
+      system("docker", "volume", "rm", "-f", state_volume_name, out: File::NULL, err: File::NULL) if agent.uuid.present?
+    end
+
     def migrate_repo_volume_from_container!
       ensure_repo_volume!
       return true if repo_volume_populated?
 
-      source = "#{agent.container_name}:#{REPO_PATH}/."
-      destination_mount = "#{repo_volume_name}:/repo"
+      copy_container_directory_to_volume!(REPO_PATH, repo_volume_name, "/repo")
+    end
+
+    def migrate_work_volume_from_container!
+      ensure_work_volume!
+      return true if work_volume_populated?
+      return true unless container_directory_exists?(WORK_PATH)
+
+      copy_container_directory_to_volume!(WORK_PATH, work_volume_name, "/work")
+    end
+
+    def copy_container_directory_to_volume!(source_path, volume_name, destination_path)
+      source = "#{agent.container_name}:#{source_path}/."
+      destination_mount = "#{volume_name}:#{destination_path}"
       cmd = [
         "docker cp #{Shellwords.escape(source)} -",
-        "docker run --rm -i -v #{Shellwords.escape(destination_mount)} busybox tar xf - -C /repo"
+        "docker run --rm -i -v #{Shellwords.escape(destination_mount)} busybox tar xf - -C #{Shellwords.escape(destination_path)}"
       ].join(" | ")
-      raise SandboxError, "failed to migrate #{REPO_PATH} into #{repo_volume_name}" unless system(cmd, out: File::NULL, err: File::NULL)
+      raise SandboxError, "failed to migrate #{source_path} into #{volume_name}" unless system(cmd, out: File::NULL, err: File::NULL)
     end
 
     def repo_volume_populated?
+      volume_populated?(repo_volume_name, "/repo")
+    end
+
+    def work_volume_populated?
+      volume_populated?(work_volume_name, "/work")
+    end
+
+    def volume_populated?(volume_name, mount_path)
       result = docker_capture(
-        "run", "--rm", "-v", "#{repo_volume_name}:/repo:ro", "busybox", "sh", "-c",
-        "test -n \"$(find /repo -mindepth 1 -print -quit)\""
+        "run", "--rm", "-v", "#{volume_name}:#{mount_path}:ro", "busybox", "sh", "-c",
+        "test -n \"$(find #{mount_path} -mindepth 1 -print -quit)\""
       )
       result[:ok]
     end
 
+    def container_directory_exists?(path)
+      docker_capture("exec", agent.container_name, "test", "-d", path)[:ok]
+    end
+
     def run_container!
       ensure_repo_volume!
+      ensure_work_volume!
+      ensure_state_volume!
+      service_manifest_file = build_service_manifest_file
+      container_created = false
       args = [
-        "docker", "run", "-d",
+        "docker", "create",
         "--name", agent.container_name,
         "--network", Agents::Config.network,
-        "--restart", "unless-stopped",
+        "--restart", Agents::Config.restart_policy,
         "--memory", "#{agent.container_memory_mb}m",
         "--cpu-shares", agent.container_cpu_shares.to_s,
         "-v", "#{Agents::Volume.new(agent).volume_name}:/home/agent/identity",
         "-v", "chaos-home-#{agent.uuid}:/home/agent/.chaos",
         "-v", "#{repo_volume_name}:#{REPO_PATH}",
+        "-v", "#{work_volume_name}:#{WORK_PATH}",
+         "-v", "#{state_volume_name}:#{STATE_PATH}",
+        "--tmpfs", "/run/helixkit:rw,noexec,nosuid,nodev,mode=0700",
         "-e", "AGENT_ID=#{agent.uuid}",
         "-e", "AGENT_SLUG=#{agent_slug}",
         "-e", "AGENT_PROVIDER=#{agent_provider}",
         "-e", "AGENT_DEFAULT_MODEL=#{agent_model}",
         "-e", "TRIGGER_BEARER_TOKEN=#{agent.trigger_bearer_token}",
         "-e", "HELIXKIT_BEARER_TOKEN=#{agent.outbound_api_token}",
-        "-e", "HELIXKIT_APP_URL=#{Agents::Config.internal_url}",
+        "-e", "HELIXKIT_APP_URL=#{Agents::Config.internal_url}"
       ]
       args += provider_env_args
       args += [ "-p", "127.0.0.1::4000" ] if Agents::Config.publish_ports?
       args << agent.container_image
 
       _stdout, stderr, status = Open3.capture3(*args)
-      raise SandboxError, "docker run failed: #{stderr}" unless status.success?
+      raise SandboxError, "docker create failed: #{stderr}" unless status.success?
+
+      container_created = true
+      _stdout, stderr, status = Open3.capture3(
+        "docker", "cp", service_manifest_file.path, "#{agent.container_name}:/run/helixkit-source.yml"
+      )
+      raise SandboxError, "docker cp failed: #{stderr}" unless status.success?
+
+      _stdout, stderr, status = Open3.capture3("docker", "start", agent.container_name)
+      raise SandboxError, "docker start failed: #{stderr}" unless status.success?
+    rescue StandardError
+      remove_container! if container_created
+      raise
+    ensure
+      service_manifest_file&.close!
+    end
+
+    def update_restart_policy!
+      system(
+        "docker", "update", "--restart", Agents::Config.restart_policy, agent.container_name,
+        out: File::NULL, err: File::NULL
+      ) || raise(SandboxError, "failed to update restart policy for #{agent.container_name}")
+    end
+
+    def build_service_manifest_file
+      file = Tempfile.new([ "helixkit-services-", ".yml" ])
+      file.chmod(0o600)
+      file.write(Agents::ServiceManifest.new(agent).to_yaml)
+      file.flush
+      file
     end
 
     def refresh_dev_endpoint!
@@ -320,17 +474,44 @@ module Agents
     end
 
     def agent_provider
-      agent.model_id.to_s.split("/").first.presence || "anthropic"
+      self.class.chaos_provider_for(agent)
+    end
+
+    def self.chaos_provider_for(agent)
+      chaos_selection_for(agent).fetch(:provider)
     end
 
     def self.chaos_model_for(agent)
-      model_id = agent.model_id.to_s
-      model_config = Chat::MODELS.find { |model| model[:model_id] == model_id }
-      return model_config[:provider_model_id] if model_config&.dig(:provider_model_id).present?
+      chaos_selection_for(agent).fetch(:model)
+    end
 
-      provider, model = model_id.split("/", 2)
-      return model_id if model.blank?
-      provider == "openrouter" ? model_id : model
+    def self.chaos_selection_for(agent)
+      subscription_provider = subscription_provider_for(agent)
+      if subscription_provider && agent.provider_auth_mode(subscription_provider) == "oauth_account"
+        return {
+          provider: subscription_provider,
+          model: Chat.model_config(agent.model_id.to_s).fetch(:provider_model_id)
+        }
+      end
+
+      selection = ResolvesProvider.resolve_provider(agent.model_id.to_s)
+      {
+        provider: CHAOS_PROVIDER_IDS.fetch(selection.fetch(:provider)),
+        model: selection.fetch(:model_id)
+      }
+    end
+
+    def self.subscription_provider_for(agent)
+      model_id = agent.model_id.to_s
+      return unless Chat.model_config(model_id)&.dig(:provider_model_id)
+
+      provider = case model_id
+      when /\Aanthropic\// then "anthropic"
+      when /\Agoogle\// then "gemini"
+      when /\Aopenai\// then "openai"
+      when /\Ax-ai\// then "xai"
+      end
+      provider if Agent::OAUTH_ACCOUNT_PROVIDERS.include?(provider)
     end
 
     def agent_model
@@ -338,20 +519,9 @@ module Agents
     end
 
     def provider_env_args
-      {
-        "ANTHROPIC_API_KEY" => credential(:anthropic, :claude),
-        "OPENAI_API_KEY" => credential(:openai, :open_ai),
-        "OPENROUTER_API_KEY" => credential(:openrouter, :openrouter),
-        "GEMINI_API_KEY" => credential(:gemini, :gemini),
-        "XAI_API_KEY" => credential(:xai, :xai)
-      }.filter_map do |name, value|
+      agent.account.ai_provider_keys.filter_map do |name, value|
         value.present? ? [ "-e", "#{name}=#{value}" ] : nil
       end.flatten
-    end
-
-    def credential(env_name, credential_name)
-      ENV["#{env_name.to_s.upcase}_API_KEY"].presence ||
-        Rails.application.credentials.dig(:ai, credential_name, :api_token).presence
     end
 
   end

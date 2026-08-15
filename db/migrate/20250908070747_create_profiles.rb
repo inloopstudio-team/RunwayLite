@@ -7,7 +7,7 @@ class CreateProfiles < ActiveRecord::Migration[8.0]
       t.string :last_name
       t.string :theme, default: "system"
       t.string :timezone
-      t.jsonb :preferences, default: {}
+      t.text :preferences, default: '{}'
 
       t.timestamps
     end
@@ -31,7 +31,7 @@ class CreateProfiles < ActiveRecord::Migration[8.0]
     remove_column :users, :first_name, :string
     remove_column :users, :last_name, :string
     remove_column :users, :timezone, :string
-    remove_column :users, :preferences, :json
+    remove_column :users, :preferences, :text
   end
 
 end

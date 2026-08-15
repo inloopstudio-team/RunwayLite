@@ -15,19 +15,11 @@
     <span class="sr-only">Menu</span>
   </DropdownMenu.Trigger>
   <DropdownMenu.Content align="end">
-    {#each links as link}
+    {#each links as link (`${link.label}:${link.href}`)}
       {#if link.show}
         <DropdownMenu.Item onclick={() => router.visit(link.href)}>{link.label}</DropdownMenu.Item>
       {/if}
     {/each}
-    {#if siteSettings?.allow_agents && currentAccount?.id}
-      <DropdownMenu.Item onclick={() => router.visit(`/accounts/${currentAccount.id}/agents`)}>
-        Identities
-      </DropdownMenu.Item>
-      <DropdownMenu.Item onclick={() => router.visit(`/accounts/${currentAccount.id}/whiteboards`)}>
-        Whiteboards
-      </DropdownMenu.Item>
-    {/if}
     {#if siteSettings?.allow_chats && currentAccount?.id}
       <DropdownMenu.Item onclick={() => router.visit(searchAccountChatsPath(currentAccount.id))}>
         Search Messages

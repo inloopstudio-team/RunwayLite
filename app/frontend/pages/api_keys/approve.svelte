@@ -5,12 +5,14 @@
   import { Input } from '$lib/components/shadcn/input/index.js';
   import { Label } from '$lib/components/shadcn/label/index.js';
   import { apiKeyApprovalPath } from '@/routes';
+  import { siteName } from '$lib/branding';
 
-  let { client_name, token, expires_at } = $props();
+  let { client_name, token, expires_at, accounts = [], selected_account_id = null } = $props();
   let keyName = $state(`${client_name} Key`);
+  let accountId = $state(selected_account_id || accounts[0]?.id);
 
   function approve() {
-    router.post(apiKeyApprovalPath(token), { key_name: keyName });
+    router.post(apiKeyApprovalPath(token), { key_name: keyName, account_id: accountId });
   }
 
   function deny() {
@@ -36,6 +38,21 @@
     <div class="p-4 bg-muted rounded-lg mb-6">
       <p class="text-sm text-muted-foreground mb-1">Application requesting access:</p>
       <p class="font-semibold text-lg">{client_name}</p>
+    </div>
+
+    <div class="mb-6">
+      <Label for="account">{$siteName} Account</Label>
+      <select
+        id="account"
+        bind:value={accountId}
+        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
+        {#each accounts as account}
+          <option value={account.id}>{account.name}</option>
+        {/each}
+      </select>
+      <p class="text-xs text-muted-foreground mt-1">
+        This external agent or tool will only be able to access this account.
+      </p>
     </div>
 
     <div class="mb-6">

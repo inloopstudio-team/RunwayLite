@@ -19,10 +19,11 @@ if Rails.env.development? || Rails.env.production?
       logger.level = original_ar_logger.level
 
       logger.formatter = proc do |severity, datetime, progname, msg|
-        if msg.include?("solid_cable") || msg.include?("SolidCable") ||
-          msg.include?("solid_queue") || msg.include?("SolidQueue")
+        msg_str = msg.to_s
+        if msg_str.include?("solid_cable") || msg_str.include?("SolidCable") ||
+          msg_str.include?("solid_queue") || msg_str.include?("SolidQueue")
           # Send SolidCable/SolidQueue database logs to the dedicated logger instead
-          solid_services_logger.public_send(severity.downcase, msg)
+          solid_services_logger.public_send(severity.downcase, msg_str)
           nil # Don't output to the main log
         else
           # Use the original formatter for non-SolidCable/SolidQueue logs
@@ -41,10 +42,11 @@ if Rails.env.development? || Rails.env.production?
       logger.level = original_job_logger.level
 
       logger.formatter = proc do |severity, datetime, progname, msg|
-        if msg.include?("SolidCable") || msg.include?("SolidQueue") ||
-          (msg.include?("job=") && (msg.include?("SolidCable%") || msg.include?("SolidQueue%")))
+        msg_str = msg.to_s
+        if msg_str.include?("SolidCable") || msg_str.include?("SolidQueue") ||
+          (msg_str.include?("job=") && (msg_str.include?("SolidCable%") || msg_str.include?("SolidQueue%")))
           # Send SolidCable/SolidQueue job logs to the dedicated logger instead
-          solid_services_logger.public_send(severity.downcase, msg)
+          solid_services_logger.public_send(severity.downcase, msg_str)
           nil # Don't output to the main log
         else
           # Use the original formatter for non-SolidCable/SolidQueue logs
@@ -63,11 +65,12 @@ if Rails.env.development? || Rails.env.production?
       logger.level = original_rails_logger.level
 
       logger.formatter = proc do |severity, datetime, progname, msg|
-        if msg.include?("SolidCable") || msg.include?("solid_cable") ||
-          msg.include?("SolidQueue") || msg.include?("solid_queue") ||
-          (msg.include?("job=") && (msg.include?("SolidCable%") || msg.include?("SolidQueue%")))
+        msg_str = msg.to_s
+        if msg_str.include?("SolidCable") || msg_str.include?("solid_cable") ||
+          msg_str.include?("SolidQueue") || msg_str.include?("solid_queue") ||
+          (msg_str.include?("job=") && (msg_str.include?("SolidCable%") || msg_str.include?("SolidQueue%")))
           # Send SolidCable/SolidQueue-related logs to the dedicated logger instead
-          solid_services_logger.public_send(severity.downcase, msg)
+          solid_services_logger.public_send(severity.downcase, msg_str)
           nil # Don't output to the main log
         else
           # Use the original formatter for non-SolidCable/SolidQueue logs

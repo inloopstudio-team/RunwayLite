@@ -8,6 +8,7 @@
     editAccountAgentPath,
     sendTestRequestAccountAgentPath,
   } from '@/routes';
+  import { siteName } from '$lib/branding';
 
   let {
     account,
@@ -88,11 +89,11 @@
 
 <div class="mx-auto max-w-4xl space-y-6 p-8">
   <div class="space-y-2">
-    <a class="text-sm text-muted-foreground hover:text-foreground" href={editPath}>Back to agent settings</a>
+    <a class="text-sm text-muted-foreground hover:text-foreground" href={editPath}>Back to resident settings</a>
     <h1 class="text-3xl font-semibold">Promote {agent.name}</h1>
     <p class="text-muted-foreground">
-      Move this agent into a RunwayLite-hosted sandbox container. RunwayLite creates the volume, starts the runtime,
-      checks health, and keeps the agent reachable without a GitHub repo, master key, DNS, or SSH deploy step.
+      Move this resident into a {$siteName}-hosted sandbox container. {$siteName} creates the volume, starts the runtime,
+      checks health, and keeps the resident reachable without a GitHub repo, master key, DNS, or SSH deploy step.
     </p>
   </div>
 
@@ -150,6 +151,10 @@
         Identity volume: <span class="font-medium">{sandboxStatus.identity_volume_exists ? 'present' : 'missing'}</span>
       </p>
       <p>Chaos volume: <span class="font-medium">{sandboxStatus.chaos_volume_exists ? 'present' : 'missing'}</span></p>
+      <p>
+        Private state volume: <span class="font-medium"
+          >{sandboxStatus.state_volume_exists ? 'present' : 'missing'}</span>
+      </p>
     </div>
     {#if sandboxStatus.docker_error}
       <div class="rounded border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
@@ -174,7 +179,7 @@
   <section class="space-y-4 rounded-lg border p-5">
     <h2 class="text-lg font-medium">Hosted sandbox promotion</h2>
     <p class="text-sm text-muted-foreground">
-      RunwayLite will generate agent-scoped credentials, create a Docker identity volume, seed the current identity,
+      {$siteName} will generate resident-scoped credentials, create a Docker identity volume, seed the current identity,
       start <span class="font-mono">helix-kit-agents</span>, and verify the shim health endpoint.
       {#if localDevEndpointMode}
         In local development, the shim port is published to <span class="font-mono">127.0.0.1</span> automatically so this

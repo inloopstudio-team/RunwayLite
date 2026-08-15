@@ -27,22 +27,27 @@ test:
   primary:
     <<: *default
     path: storage/test.sqlite3
+    pool: 1
   fosm:
     <<: *default
     path: storage/fosm_test.sqlite3
     migrations_paths: db/fosm_migrate
+    pool: 1
   cache:
     <<: *default
     path: storage/test_cache.sqlite3
     migrations_paths: db/cache_migrate
+    pool: 1
   queue:
     <<: *default
     path: storage/test_queue.sqlite3
     migrations_paths: db/queue_migrate
+    pool: 1
   cable:
     <<: *default
     path: storage/test_cable.sqlite3
     migrations_paths: db/cable_migrate
+    pool: 1
 
 production:
   primary: &primary_production

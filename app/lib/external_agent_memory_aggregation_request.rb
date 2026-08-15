@@ -11,35 +11,7 @@ class ExternalAgentMemoryAggregationRequest
   end
 
   def call
-    return { status: 503, error: "external runtime unreachable" } if agent.offline? || agent_unhealthy?
-    raise ArgumentError, "period must be one of #{PERIODS.to_sentence}" unless PERIODS.include?(period)
-    raise ArgumentError, "target is required" if target.blank?
-
-    endpoint_url = Agents::Endpoint.url_for(agent)
-    session_id = "#{agent.uuid}-memory-#{period}-#{target}"
-    request = request_text
-
-    AgentRuntimeInteraction.record_trigger!(
-      agent: agent,
-      chat: nil,
-      trigger_kind: "memory_aggregation_#{period}",
-      conversation_id: nil,
-      requested_by: requested_by,
-      session_id: session_id,
-      endpoint_url: endpoint_url,
-      request_text: request
-    ) do
-      ChaosTriggerClient.new(endpoint_url, agent.trigger_bearer_token).request_response(
-        conversation_id: nil,
-        requested_by: requested_by,
-        session_id: session_id,
-        trigger_kind: "memory_aggregation_#{period}",
-        request: request,
-        model: Agents::Sandbox.chaos_model_for(agent),
-        read_timeout: AGGREGATION_TIMEOUT_SECS + 30,
-        runtime_timeout_secs: AGGREGATION_TIMEOUT_SECS
-      )
-    end
+    Agents::Sandbox.new(agent).with_runtime { perform }
   rescue StandardError => e
     Rails.logger.warn "[ExternalAgentMemoryAggregationRequest] #{agent.id} #{period}/#{target} failed: #{e.class}: #{e.message}"
     { status: 0, error: e.message }
@@ -49,12 +21,55 @@ class ExternalAgentMemoryAggregationRequest
 
   attr_reader :agent, :period, :target, :requested_by
 
+  def perform
+    return { status: 503, error: "external runtime unreachable" } if agent.offline? || agent_unhealthy?
+    raise ArgumentError, "period must be one of #{PERIODS.to_sentence}" unless PERIODS.include?(period)
+    raise ArgumentError, "target is required" if target.blank?
+
+    endpoint_url = Agents::Endpoint.url_for(agent)
+    session_id = "#{agent.uuid}-memory-#{period}-#{target}"
+    request = request_text
+    auth_mode = agent.provider_auth_mode(provider)
+
+    AgentRuntimeInteraction.record_trigger!(
+      agent: agent,
+      chat: nil,
+      trigger_kind: "memory_aggregation_#{period}",
+      conversation_id: nil,
+      requested_by: requested_by,
+      session_id: session_id,
+      endpoint_url: endpoint_url,
+      request_text: request,
+      provider_auth_mode: auth_mode
+    ) do
+      ChaosTriggerClient.new(endpoint_url, agent.trigger_bearer_token).request_response(
+        conversation_id: nil,
+        requested_by: requested_by,
+        session_id: session_id,
+        trigger_kind: "memory_aggregation_#{period}",
+        request: request,
+        provider: provider,
+        model: Agents::Sandbox.chaos_model_for(agent),
+        reasoning_effort: agent.reasoning_effort,
+        auth_mode: auth_mode,
+        read_timeout: AGGREGATION_TIMEOUT_SECS + 30,
+        runtime_timeout_secs: AGGREGATION_TIMEOUT_SECS
+      )
+    end
+  end
+
+  def provider
+    @provider ||= Agents::Sandbox.chaos_provider_for(agent)
+  end
+
   def agent_unhealthy?
     agent.health_state == "unhealthy" && agent.consecutive_health_failures >= 6
   end
 
   def request_text
-    <<~TEXT
+    [
+      Notices::Renderer.section_for(agent),
+      <<~TEXT
       HelixKit is inviting you to run a #{period} memory aggregation for #{target}.
 
       This is a scaffolded continuity invitation, not a Rails-authored summary task. Wake as yourself, with your own identity and judgment. Read the relevant journal and aggregation files from your hosted filesystem, then decide what, if anything, should be integrated.
@@ -83,7 +98,8 @@ class ExternalAgentMemoryAggregationRequest
       - Treat `~/identity/soul.md` as protected defining identity. Do not edit it.
 
       When finished, say briefly on stdout what you changed, including whether the aggregation file changed and whether self-narrative changed.
-    TEXT
+      TEXT
+    ].compact_blank.join("\n\n")
   end
 
   def output_path_bullet

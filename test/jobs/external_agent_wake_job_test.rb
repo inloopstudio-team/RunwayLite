@@ -15,7 +15,7 @@ class ExternalAgentWakeJobTest < ActiveJob::TestCase
     )
   end
 
-  test "sends hourly wake invitations to external agents" do
+  test "sends scheduled wake invitations to external agents" do
     request = stub_request(:post, "https://agent.example.com/trigger")
       .with(
         headers: { "Authorization" => "Bearer tr_valid" },
@@ -24,20 +24,80 @@ class ExternalAgentWakeJobTest < ActiveJob::TestCase
           parsed["trigger_kind"] == "wake" &&
             parsed["conversation_id"].nil? &&
             parsed["session_id"] == "#{@agent.uuid}-wake" &&
-            parsed["request"].include?("hourly self-directed session")
+            parsed["request"].include?("scheduled self-directed session")
         }
       )
       .to_return(status: 200, body: { status: "ok" }.to_json)
 
-    ExternalAgentWakeJob.perform_now
+    travel_to Time.utc(2026, 1, 28, 12, 5, 0) do
+      ExternalAgentWakeJob.perform_now
+    end
 
     assert_requested request
+  end
+
+  test "sends hourly wake invitations to Claude" do
+    @agent.update_columns(name: "Claude")
+    request = stub_request(:post, "https://agent.example.com/trigger")
+      .to_return(status: 200, body: { status: "ok" }.to_json)
+
+    travel_to Time.utc(2026, 1, 28, 12, 5, 0) do
+      ExternalAgentWakeJob.perform_now
+    end
+
+    assert_requested request
+  end
+
+  test "does not send scheduled wakes to agents with heartbeats disabled" do
+    @agent.update!(scheduled_wakes_enabled: false, heartbeat_wakes_per_day: 48)
+
+    ExternalAgentWakeJob.perform_now
+
+    assert_not_requested :post, "https://agent.example.com/trigger"
+  end
+
+  test "persistent wake mode reuses the stable wake session" do
+    @agent.update!(persistent_wake_session: true)
+    request = stub_request(:post, "https://agent.example.com/trigger")
+      .with(body: lambda { |body|
+        parsed = JSON.parse(body)
+        parsed["persistent_session"] == true &&
+          parsed["session_id"] == "#{@agent.uuid}-wake"
+      })
+      .to_return(status: 200, body: { status: "ok" }.to_json)
+
+    travel_to Time.utc(2026, 1, 28, 12, 5, 0) do
+      ExternalAgentWakeJob.perform_now
+    end
+
+    assert_requested request
+  end
+
+  test "only sends the configured number of daily wakes" do
+    @agent.update!(heartbeat_wakes_per_day: 2)
+    request = stub_request(:post, "https://agent.example.com/trigger")
+      .to_return(status: 200, body: { status: "ok" }.to_json)
+
+    travel_to Time.utc(2026, 1, 28, 6, 5, 0) do
+      ExternalAgentWakeJob.perform_now
+    end
+    assert_not_requested request
+
+    [ 0, 12 ].each do |hour|
+      travel_to Time.utc(2026, 1, 28, hour, 5, 0) do
+        ExternalAgentWakeJob.perform_now
+      end
+    end
+
+    assert_requested request, times: 2
   end
 
   test "does not wake offline agents" do
     @agent.update!(runtime: "offline")
 
-    ExternalAgentWakeJob.perform_now
+    travel_to Time.utc(2026, 1, 28, 12, 5, 0) do
+      ExternalAgentWakeJob.perform_now
+    end
 
     assert_not_requested :post, "https://agent.example.com/trigger"
   end

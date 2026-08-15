@@ -16,6 +16,7 @@ class ApplicationController < ActionController::Base
         user: Current.user.as_json,
         account: current_account&.as_json,
         accounts: Current.user.confirmed_accounts.map(&:as_json),
+        account_has_whiteboards: current_account&.whiteboards&.active&.exists? || false,
         theme_preference: Current.user&.theme || cookies[:theme],
         site_settings: shared_site_settings,
         is_account_admin: current_account&.manageable_by?(Current.user) || false,
@@ -74,6 +75,9 @@ class ApplicationController < ActionController::Base
 
     changes = record.saved_changes.except(:updated_at)
     data = extra_data.merge(changes)
+    data = ActiveSupport::ParameterFilter
+      .new(Rails.application.config.filter_parameters)
+      .filter(data)
 
     audit(action, record, **data)
   end

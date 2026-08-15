@@ -16,6 +16,7 @@
   import ThinkingBlock from '$lib/components/chat/ThinkingBlock.svelte';
   import ModerationIndicator from '$lib/components/chat/ModerationIndicator.svelte';
   import AudioPlayer from '$lib/components/chat/AudioPlayer.svelte';
+  import MessageTelemetry from '$lib/components/chat/MessageTelemetry.svelte';
   import { Streamdown } from 'svelte-streamdown';
   import { formatTime, formatDateTime } from '$lib/utils';
   import { reasoningSkipTooltip } from '$lib/chat-utils';
@@ -26,6 +27,7 @@
     isLastVisible = false,
     isGroupChat = false,
     showResend = false,
+    showMessageTelemetry = false,
     streamingThinking = '',
     shikiTheme = 'catppuccin-latte',
     onedit,
@@ -41,6 +43,19 @@
   function getBubbleClass(colour) {
     if (!colour) return '';
     return `bg-${colour}-100 dark:bg-${colour}-900`;
+  }
+
+  function dollars(value) {
+    if (value === null || value === undefined) return null;
+
+    const amount = Number(value);
+    const digits = amount < 0.01 ? 4 : 2;
+    return `≈${new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(amount)}`;
   }
 </script>
 
@@ -85,19 +100,10 @@
               <Streamdown
                 content={message.content}
                 inlineCitation={expressionTag}
-                parseIncompleteMarkdown
                 baseTheme="shadcn"
                 {shikiTheme}
                 shikiPreloadThemes={['catppuccin-latte', 'catppuccin-mocha']}
-                class="prose"
-                animation={{
-                  enabled: true,
-                  type: 'fade',
-                  tokenize: 'word',
-                  duration: 300,
-                  timingFunction: 'ease-out',
-                  animateOnMount: false,
-                }} />
+                class="prose" />
             </Card.Content>
           </Card.Root>
         </div>
@@ -153,19 +159,18 @@
               <Streamdown
                 content={message.content}
                 inlineCitation={expressionTag}
-                parseIncompleteMarkdown
                 baseTheme="shadcn"
                 {shikiTheme}
                 shikiPreloadThemes={['catppuccin-latte', 'catppuccin-mocha']}
-                class="prose"
-                animation={{
-                  enabled: true,
-                  type: 'fade',
-                  tokenize: 'word',
-                  duration: 300,
-                  timingFunction: 'ease-out',
-                  animateOnMount: true,
-                }} />
+                class="prose" />
+            {/if}
+
+            {#if message.files_json && message.files_json.length > 0}
+              <div class:mt-3={message.content || message.thinking || streamingThinking} class="space-y-2">
+                {#each message.files_json as file}
+                  <FileAttachment {file} onImageClick={onimagelightbox} />
+                {/each}
+              </div>
             {/if}
 
             {#if message.tools_used && message.tools_used.length > 0}
@@ -182,38 +187,54 @@
             {/if}
           </Card.Content>
         </Card.Root>
-        <div class="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-          {#if message.moderation_scores}
-            <ModerationIndicator scores={message.moderation_scores} />
-          {/if}
-          {#if isGroupChat && message.author_name}
-            <span class="mr-1">{message.author_name} ·</span>
-          {/if}
-          <span class="group">
-            {formatTime(message.created_at)}
-            <span class="hidden group-hover:inline-block">({formatDateTime(message.created_at, true)})</span>
-          </span>
-          {#if message.reasoning_skip_reason}
-            <span
-              title={message.reasoning_skip_reason_label || reasoningSkipTooltip(message.reasoning_skip_reason)}
-              class="text-muted-foreground inline-flex items-center"
-              aria-label="Thinking unavailable for this message">
-              <LightbulbFilament size={14} />
+        <div class="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div class="flex items-center gap-2">
+            {#if message.moderation_scores}
+              <ModerationIndicator scores={message.moderation_scores} />
+            {/if}
+            {#if isGroupChat && message.author_name}
+              <span>{message.author_name}</span>
+              <span>·</span>
+            {/if}
+            {#if message.interaction_cost?.amount_usd}
+              <span
+                class:line-through={message.interaction_cost.applies_to_billing === false}
+                title={message.interaction_cost.applies_to_billing === false
+                  ? 'This activation used a provider subscription, so this API-equivalent estimate does not apply.'
+                  : `Estimated interaction cost using ${message.interaction_cost.pricing_as_of} prices`}>
+                {dollars(message.interaction_cost.amount_usd)}
+              </span>
+              <span>·</span>
+            {/if}
+            <span class="group">
+              {formatTime(message.created_at)}
+              <span class="hidden group-hover:inline-block">({formatDateTime(message.created_at, true)})</span>
             </span>
-          {/if}
-          {#if message.status === 'pending'}
-            <span class="ml-2 text-blue-600">...</span>
-          {:else if message.streaming}
-            <span class="ml-2 text-green-600 animate-pulse">...</span>
-          {/if}
-          {#if message.fixable}
-            <button
-              onclick={() => onfix(message.id)}
-              class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-amber-500 transition-colors md:opacity-0 md:group-hover:opacity-100"
-              title="Fix hallucinated tool call">
-              <Wrench size={14} />
-              Fix
-            </button>
+            {#if message.reasoning_skip_reason}
+              <span
+                title={message.reasoning_skip_reason_label || reasoningSkipTooltip(message.reasoning_skip_reason)}
+                class="text-muted-foreground inline-flex items-center"
+                aria-label="Thinking unavailable for this message">
+                <LightbulbFilament size={14} />
+              </span>
+            {/if}
+            {#if message.status === 'pending'}
+              <span class="ml-2 text-blue-600">...</span>
+            {:else if message.streaming}
+              <span class="ml-2 text-green-600 animate-pulse">...</span>
+            {/if}
+            {#if message.fixable}
+              <button
+                onclick={() => onfix(message.id)}
+                class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-amber-500 transition-colors md:opacity-0 md:group-hover:opacity-100"
+                title="Fix hallucinated tool call">
+                <Wrench size={14} />
+                Fix
+              </button>
+            {/if}
+          </div>
+          {#if showMessageTelemetry && message.ruby_llm_telemetry}
+            <MessageTelemetry telemetry={message.ruby_llm_telemetry} />
           {/if}
         </div>
         {#if message.voice_available && !message.streaming}

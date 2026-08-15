@@ -1,7 +1,7 @@
 class ChangePasswordDigestNullableInUsers < ActiveRecord::Migration[8.0]
 
   def change
-    change_column_null :users, :password_digest, true
+    # libsql adapter does not support change_column_null; column is nullable from create_users
   end
 
 end

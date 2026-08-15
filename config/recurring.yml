@@ -19,22 +19,27 @@ production:
     queue: default
     schedule: every day at 3am
 
-  consolidate_conversations:
-    class: ConsolidateStaleConversationsJob
-    schedule: every hour at minute 30
-
-  database_backup:
-    class: DatabaseBackupJob
+  full_backup:
+    class: FullBackupJob
     schedule: every day at 4am
 
   conversation_initiation:
     class: ConversationInitiationJob
     schedule: every hour at minute 0
 
+  conversation_initiation_half_hour:
+    class: ConversationInitiationJob
+    schedule: every hour at minute 30
+
   external_agent_wake:
     class: ExternalAgentWakeJob
     queue: default
     schedule: every hour at minute 5
+
+  external_agent_extra_half_hour_wake:
+    class: ExternalAgentWakeJob
+    queue: default
+    schedule: every hour at minute 35
 
   external_agent_daily_memory_aggregation:
     class: ExternalAgentMemoryAggregationJob
