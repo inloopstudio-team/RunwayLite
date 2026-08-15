@@ -5,7 +5,7 @@ class CreateAccounts < ActiveRecord::Migration[8.0]
       t.string :name, null: false
       t.integer :account_type, null: false, default: 0  # enum: personal/team
       t.string :slug
-      t.jsonb :settings, default: {}
+      t.text :settings, default: '{}'
       t.timestamps
 
       t.index :slug, unique: true

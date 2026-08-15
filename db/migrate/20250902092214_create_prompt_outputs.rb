@@ -5,7 +5,7 @@ class CreatePromptOutputs < ActiveRecord::Migration[8.0]
       t.references :account, foreign_key: true  # Nullable for non-account specific outputs
       t.string :prompt_key
       t.text :output
-      t.jsonb :output_json, default: {}
+      t.text :output_json, default: '{}'
 
       t.timestamps
     end

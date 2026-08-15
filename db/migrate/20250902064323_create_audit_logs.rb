@@ -6,7 +6,7 @@ class CreateAuditLogs < ActiveRecord::Migration[8.0]
       t.references :account, foreign_key: true  # Nullable for non-account actions
       t.references :auditable, polymorphic: true
       t.string :action, null: false
-      t.jsonb :changes, default: {}
+      t.text :data, default: '{}'
       t.string :ip_address
       t.string :user_agent
 

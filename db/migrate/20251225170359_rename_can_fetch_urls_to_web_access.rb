@@ -1,7 +1,7 @@
 class RenameCanFetchUrlsToWebAccess < ActiveRecord::Migration[8.1]
 
   def change
-    rename_column :chats, :can_fetch_urls, :web_access
+    # libsql does not support rename_column; column already named :web_access in add_can_fetch_urls_to_chats
   end
 
 end

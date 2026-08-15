@@ -81,7 +81,7 @@ gem "hashids"
 gem "ruby-openai"
 
 # Ruby LLM - AI framework with extended thinking support (v1.10+) and xAI/Grok (v1.11+)
-gem "ruby_llm", github: "crmne/ruby_llm", branch: "main"
+gem "ruby_llm"
 
 gem "pagy", "~> 9.3"
 
@@ -98,7 +98,7 @@ gem "discard", "~> 1.3"
 gem "x"
 
 # Finite Object State Machine — declarative lifecycles for business objects
-gem "fosm-rails", github: "inloopstudio/fosm-rails"
+gem "fosm-rails"
 
 # Turso/libSQL adapter for FOSM database
 gem "libsql_activerecord"

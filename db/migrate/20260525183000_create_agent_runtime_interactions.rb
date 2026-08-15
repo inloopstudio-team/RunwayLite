@@ -15,7 +15,7 @@ class CreateAgentRuntimeInteractions < ActiveRecord::Migration[8.1]
       t.text :request_text
       t.text :stdout
       t.text :stderr
-      t.jsonb :response_body, null: false, default: {}
+      t.text :response_body, null: false, default: '{}'
       t.string :error_class
       t.text :error_message
       t.datetime :started_at, null: false
