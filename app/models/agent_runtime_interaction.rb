@@ -1,5 +1,5 @@
 class AgentRuntimeInteraction < ApplicationRecord
-  serialize :response_body, coder: JSON
+  json_serialize :response_body
 
   SUPPORTED_TELEMETRY_SCHEMA_VERSION = 1
   LOCAL_USAGE_SCOPES = %w[invocation trigger].freeze

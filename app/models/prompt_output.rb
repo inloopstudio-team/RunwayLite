@@ -1,5 +1,5 @@
 class PromptOutput < ApplicationRecord
-  serialize :output_json, coder: JSON
+  json_serialize :output_json
 
 
   belongs_to :account, optional: true

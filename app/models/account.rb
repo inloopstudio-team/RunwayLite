@@ -1,5 +1,5 @@
 class Account < ApplicationRecord
-  serialize :settings, coder: JSON
+  json_serialize :settings
 
   include JsonAttributes
   include SyncAuthorizable
