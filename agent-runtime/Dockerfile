@@ -7,10 +7,22 @@
 # Local build:
 #   docker build -t helixkit-agent-runtime:local agent-runtime
 
+# Pin merged subscription-auth, clamp telemetry, headless clamp, and Antigravity
+# support so hosted runtime rebuilds do not depend on movement of a branch ref.
+# Pin bumps must re-verify provider auth ceremony parsers and clamp subprocess
+# patterns in trigger_shim.py. This ref also preserves the original SQLx
+# migration checksum used by persisted Chaos journals; do not move to a ref
+# which rewrites var/proc/db/migrate/sqlite/0001_bigbang.sql.
+ARG CHAOS_REPO=https://github.com/seuros/chaos.git
+ARG CHAOS_REF=b9b28befbe64c375d6eb64cbfe397e50ce5e1f96
+
 # =============================================================================
 # Stage 1 — pull and build chaos. Source tree is discarded after the binary copies.
 # =============================================================================
 FROM rust:1.95-bookworm AS builder
+
+ARG CHAOS_REPO
+ARG CHAOS_REF
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,9 +34,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
     && rm -rf /var/lib/apt/lists/*
 
-# Pin to a specific chaos commit SHA for reproducibility.
-ARG CHAOS_REPO=https://github.com/seuros/chaos.git
-ARG CHAOS_REF=d3bb3e9418cef11c64b83326f8bb9559daf9ec2b
 
 WORKDIR /build
 RUN git clone --filter=blob:none ${CHAOS_REPO} chaos \
@@ -40,6 +49,9 @@ RUN cargo build --release --bin chaos \
 # Stage 2 — runtime
 # =============================================================================
 FROM debian:bookworm-slim AS runtime
+
+ARG CHAOS_REF
+LABEL house.souls.chaos-ref="${CHAOS_REF}"
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
