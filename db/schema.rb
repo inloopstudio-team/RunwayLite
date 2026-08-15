@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_05_120001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_09_203000) do
 # Could not dump table "accounts" because of following NameError
 #   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
 

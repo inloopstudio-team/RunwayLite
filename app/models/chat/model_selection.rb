@@ -6,41 +6,19 @@ module Chat::ModelSelection
   # Model IDs from OpenRouter API: https://openrouter.ai/api/v1/models
   # provider_model_id: the model ID used when calling the provider's direct API
   MODELS = [
-    # Top Models - Flagship from each major provider
+    # Top Models - One flagship per major provider
     {
-      model_id: "openai/gpt-5.5",
-      label: "GPT-5.5",
+      model_id: "openai/gpt-5.6-sol",
+      label: "GPT-5.6 Sol",
       group: "Top Models",
-      provider_model_id: "gpt-5.5",
+      provider_model_id: "gpt-5.6-sol",
       thinking: { supported: true }
     },
     {
-      model_id: "openai/gpt-5.4",
-      label: "GPT-5.4",
+      model_id: "anthropic/claude-fable-5",
+      label: "Claude Fable 5",
       group: "Top Models",
-      provider_model_id: "gpt-5.4",
-      thinking: { supported: true }
-    },
-    {
-      model_id: "anthropic/claude-opus-4.8",
-      label: "Claude Opus 4.8",
-      group: "Top Models",
-      provider_model_id: "claude-opus-4-8",
-      thinking: { supported: true, requires_direct_api: true }
-    },
-    {
-      model_id: "anthropic/claude-opus-4.7",
-      label: "Claude Opus 4.7",
-      group: "Top Models",
-      provider_model_id: "claude-opus-4-7",
-      thinking: { supported: true, requires_direct_api: true }
-    },
-    {
-      model_id: "anthropic/claude-opus-4.6",
-      label: "Claude Opus 4.6",
-      group: "Top Models",
-      provider_model_id: "claude-opus-4-6",
-      thinking: { supported: true, requires_direct_api: true }
+      provider_model_id: "claude-fable-5"
     },
     {
       model_id: "deepseek/deepseek-v4-pro-0813",
@@ -71,6 +49,7 @@ module Chat::ModelSelection
     { model_id: "z-ai/glm-5.2", label: "GLM 5.2", group: "Top Models", thinking: { supported: true } },
 
     # OpenAI
+    { model_id: "openai/gpt-5.5", label: "GPT-5.5", group: "OpenAI", provider_model_id: "gpt-5.5", thinking: { supported: true } },
     {
       model_id: "openai/gpt-5.5-pro",
       label: "GPT-5.5 Pro",
@@ -561,6 +540,32 @@ module Chat::ModelSelection
     { model_id: "z-ai/glm-4.5", label: "GLM 4.5", group: "Z.ai", thinking: { supported: true } }
   ].freeze
 
+  REASONING_OPTIONS = {
+    none: { value: "none", label: "None", description: "Disable additional model reasoning." },
+    minimal: { value: "minimal", label: "Minimal", description: "Use the smallest available reasoning allowance." },
+    low: { value: "low", label: "Low", description: "Faster responses with lighter reasoning." },
+    medium: { value: "medium", label: "Medium", description: "Balance speed and reasoning depth." },
+    high: { value: "high", label: "High", description: "Use more reasoning for difficult or ambiguous work." },
+    xhigh: { value: "xhigh", label: "Extra high", description: "Use extra reasoning depth for complex work." },
+    max: { value: "max", label: "Max", description: "Use the model's maximum reasoning depth." },
+    ultra: { value: "ultra", label: "Ultra", description: "Use maximum reasoning with automatic task delegation." }
+  }.freeze
+
+  REASONING_PROFILES = {
+    openai_ultra: { label: "Reasoning effort", default: "medium", options: %i[low medium high xhigh max ultra] },
+    openai_max: { label: "Reasoning effort", default: "medium", options: %i[low medium high xhigh max] },
+    openai_xhigh: { label: "Reasoning effort", default: "medium", options: %i[low medium high xhigh] },
+    openai_legacy: { label: "Reasoning effort", default: "medium", options: %i[minimal low medium high xhigh] },
+    anthropic: { label: "Effort", default: "high", options: %i[low medium high xhigh max] },
+    anthropic_fable: { label: "Effort", default: "high", options: %i[low medium high xhigh max ultra] },
+    gemini_full: { label: "Thinking level", default: "medium", options: %i[minimal low medium high] },
+    gemini_pro: { label: "Thinking level", default: "high", options: %i[low medium high] },
+    grok: { label: "Reasoning effort", default: "high", options: %i[none low medium high] },
+    grok_fast: { label: "Reasoning effort", default: "high", options: %i[low high] },
+    grok_multi_agent: { label: "Reasoning effort", default: "high", options: %i[low medium high xhigh] },
+    thinking_mode: { label: "Thinking mode", default: "high", options: %i[none high], labels: { none: "Off", high: "On" } }
+  }.freeze
+
   included do
     const_set(:MODELS, MODELS) unless const_defined?(:MODELS, false)
   end
@@ -572,6 +577,20 @@ module Chat::ModelSelection
 
     def supports_thinking?(model_id)
       model_config(model_id)&.dig(:thinking, :supported) == true
+    end
+
+    def reasoning_effort_config(model_id)
+      profile = reasoning_profile_for(model_id)
+      return nil unless profile
+
+      labels = profile.fetch(:labels, {})
+      {
+        label: profile.fetch(:label),
+        default: profile.fetch(:default),
+        options: profile.fetch(:options).map do |effort|
+          REASONING_OPTIONS.fetch(effort).merge(label: labels.fetch(effort, REASONING_OPTIONS.fetch(effort)[:label]))
+        end
+      }
     end
 
     def supports_audio_input?(model_id)

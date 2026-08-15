@@ -293,7 +293,7 @@ class ChatThinkingTest < ActiveSupport::TestCase
 
     assert model, "Claude Opus 4.8 should be available"
     assert_equal "Claude Opus 4.8", model[:label]
-    assert_equal "Top Models", model[:group]
+    assert_equal "Anthropic", model[:group]
     assert_equal "claude-opus-4-8", model[:provider_model_id]
     assert_equal true, model.dig(:thinking, :supported)
     assert_equal true, model.dig(:thinking, :requires_direct_api)

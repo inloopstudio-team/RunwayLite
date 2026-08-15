@@ -1,9 +1,9 @@
 class MigrateOuraCredentialsToServiceConnections < ActiveRecord::Migration[8.1]
 
   def up
-    OuraIntegration.reset_column_information
-    ServiceConnection.reset_column_information
-    AgentServiceAccess.reset_column_information
+    # no-op: ServiceConnection model does not exist in talkyform;
+    # this migration is from helix_kit's service_connections refactor.
+    return
 
     OuraIntegration.includes(user: :accounts).find_each do |integration|
       next if integration.access_token.blank? && integration.refresh_token.blank?
