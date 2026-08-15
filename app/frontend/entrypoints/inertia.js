@@ -4,16 +4,13 @@ import { mount } from 'svelte';
 import Layout from '../layouts/Layout.svelte';
 import * as logging from '$lib/logging';
 
-// Configure CSRF token for all Inertia requests
-// This is the correct way to handle CSRF tokens with Inertia.js and Rails
-router.defaults = {
-  headers: {
-    'X-CSRF-Token': () => {
-      const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-      return token || '';
-    },
-  },
-};
+// Configure CSRF token for all Inertia requests.
+// `router.defaults` is not read by @inertiajs/core, so headers set that way
+// were silently dropped. Inject the token on every visit via the `before` event instead.
+router.on('before', (event) => {
+  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+  event.detail.visit.headers['X-CSRF-Token'] = token || '';
+});
 
 createInertiaApp({
   // Set default page title
