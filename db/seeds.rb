@@ -9,8 +9,24 @@
 #   end
 
 setting = Setting.instance
-setting.update!(site_name: 'RunwayLite') if setting.site_name.blank? || setting.site_name == 'HelixKit'
+setting.site_name = 'RunwayLite' if setting.site_name.blank? || setting.site_name == 'HelixKit'
+setting.allow_agents = true
+setting.allow_chats = true
+setting.save!
 puts "✓ Site settings initialized"
+
+# Seed a default agent on the first account so chats work out of the box
+first_account = Account.first
+if first_account && first_account.agents.none?
+  first_account.agents.create!(
+    name: "Assistant",
+    icon: "Sparkle",
+    colour: "violet",
+    runtime: "inline",
+    reasoning_effort: "medium"
+  )
+  puts "✓ Default agent created"
+end
 
 # Load environment-specific seeds
 if Rails.env.test? && File.exist?(Rails.root.join('db/seeds/test.rb'))

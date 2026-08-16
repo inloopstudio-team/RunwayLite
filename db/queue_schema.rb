@@ -10,5 +10,48 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 0) do
+ActiveRecord::Schema[8.1].define(version: 2020_01_01_000000) do
+# Could not dump table "solid_queue_blocked_executions" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
+
+# Could not dump table "solid_queue_claimed_executions" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
+
+# Could not dump table "solid_queue_failed_executions" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
+
+# Could not dump table "solid_queue_jobs" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
+
+# Could not dump table "solid_queue_pauses" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
+
+# Could not dump table "solid_queue_processes" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
+
+# Could not dump table "solid_queue_ready_executions" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
+
+# Could not dump table "solid_queue_recurring_executions" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
+
+# Could not dump table "solid_queue_recurring_tasks" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
+
+# Could not dump table "solid_queue_scheduled_executions" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
+
+# Could not dump table "solid_queue_semaphores" because of following NameError
+#   undefined local variable or method 'native_database_types' for class ActiveRecord::ConnectionAdapters::LibsqlAdapter
+
 end

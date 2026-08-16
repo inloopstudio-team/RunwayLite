@@ -1,8 +1,8 @@
 class AiModel < ApplicationRecord
-  serialize :modalities, coder: JSON
-  serialize :capabilities, coder: JSON
-  serialize :pricing, coder: JSON
-  serialize :metadata, coder: JSON
+  json_serialize :modalities
+  json_serialize :capabilities
+  json_serialize :pricing
+  json_serialize :metadata
 
 
   has_many :chats

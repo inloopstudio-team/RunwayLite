@@ -1,6 +1,6 @@
 class AuditLog < ApplicationRecord
 
-  serialize :data, coder: JSON
+  json_serialize :data
 
   include ObfuscatesId
   include SyncAuthorizable

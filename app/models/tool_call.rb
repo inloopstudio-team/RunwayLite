@@ -1,8 +1,8 @@
 class ToolCall < ApplicationRecord
 
-  serialize :arguments, coder: JSON
-  serialize :metadata, coder: JSON
-  serialize :replay_payload, coder: JSON
+  json_serialize :arguments
+  json_serialize :metadata
+  json_serialize :replay_payload
 
 
   belongs_to :message

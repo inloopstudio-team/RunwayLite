@@ -1,5 +1,5 @@
 class Profile < ApplicationRecord
-  serialize :preferences, coder: JSON
+  json_serialize :preferences
 
 
   include JsonAttributes

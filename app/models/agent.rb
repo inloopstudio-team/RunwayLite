@@ -1,5 +1,5 @@
 class Agent < ApplicationRecord
-  serialize :enabled_tools, coder: JSON
+  json_serialize :enabled_tools
 
   include ActionView::Helpers::DateHelper
   include Broadcastable

@@ -1,5 +1,5 @@
 <script>
-  import logoSrc from '../../../../assets/images/souls-house-logo.svg?raw';
+  import logoSrc from '../../../../assets/images/inloop-logo.svg?raw';
   let props = $props();
 
   // Extract props for the SVG element

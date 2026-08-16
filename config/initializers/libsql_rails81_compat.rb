@@ -277,23 +277,49 @@ if defined?(ActiveRecord::ConnectionAdapters::LibsqlAdapter)
 
   # Fix 15 (cont): patch the migration DSL objects so `t.jsonb` and
   # `t.add_column ..., :jsonb` resolve to :text on libSQL.
+  # Strip PostgreSQL-specific column options (:array) that libSQL doesn't understand.
+  module LibsqlColumnPatch
+
+    def column(name, type, **options)
+      options.delete(:array)
+      # Serialize Array/Hash defaults to JSON strings — libSQL can't quote them as SQL literals.
+      if options[:default].is_a?(Array) || options[:default].is_a?(Hash)
+        options[:default] = options[:default].to_json
+      end
+      super(name, type, **options)
+    end
+
+  end
+
   [ ActiveRecord::ConnectionAdapters::TableDefinition,
     ActiveRecord::ConnectionAdapters::Table ].each do |klass|
+    klass.prepend(LibsqlColumnPatch)
     klass.class_eval do
       def jsonb(name, **options)
         # Do NOT pre-serialize the default — let the :json AR type handle it.
         # Pre-serializing causes double-encoding: {}.to_json → "{}" → JSON.encode("{}") → "\"{}\""
         column(name, :json, **options)
       end
+
+      def uuid(name, **options)
+        column(name, :string, **options)
+      end
     end
   end
 
   # Fix 17: remove_index generates "DROP INDEX name ON table" — SQLite syntax is
   # "DROP INDEX name" with no ON clause. Intercept and issue correct SQL.
+  # Also: strip the `using:` option (e.g. :gin for jsonb) — SQLite only supports
+  # btree indexes and doesn't accept a USING clause.
   ActiveRecord::ConnectionAdapters::LibsqlAdapter.class_eval do
     def remove_index(table_name, column_name = nil, **options)
       index_name = options[:name] || index_name(table_name, column_name)
       execute("DROP INDEX IF EXISTS #{quote_column_name(index_name)}")
+    end
+
+    def add_index(table_name, column_name, **options)
+      options.delete(:using)
+      super(table_name, column_name, **options)
     end
   end
 

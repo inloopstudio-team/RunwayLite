@@ -1,8 +1,8 @@
 class Message < ApplicationRecord
 
-  serialize :tools_used, coder: JSON
-  serialize :moderation_scores, coder: JSON
-  serialize :replay_payload, coder: JSON
+  json_serialize :tools_used
+  json_serialize :moderation_scores
+  json_serialize :replay_payload
 
   include Broadcastable
   include ObfuscatesId

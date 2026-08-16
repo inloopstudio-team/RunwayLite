@@ -1,5 +1,5 @@
 class GithubIntegration < ApplicationRecord
-  serialize :recent_commits, coder: JSON
+  json_serialize :recent_commits
 
 
   include GithubApi
